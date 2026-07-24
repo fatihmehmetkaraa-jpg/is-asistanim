@@ -16,16 +16,17 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect } = React;
+    const { useState, useEffect, useRef } = React;
 
     function App() {
       const [darkMode, setDarkMode] = useState(false);
       const [activeTab, setActiveTab] = useState("daily");
       const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
       
+      const fileInputRef = useRef(null);
+      const [selectedImage, setSelectedImage] = useState(null);
+
       const [tasks, setTasks] = useState([]);
-      
-      // Toplantı Grupları (Ana Başlıklar ve İçindeki Tarihli Notlar)
       const [meetingTopics, setMeetingTopics] = useState([
         {
           id: "top_1",
@@ -36,11 +37,6 @@
               id: "n1",
               date: "2026-07-20",
               content: "16 adet steel tapping plate montajında tork tabancası kullanımı değerlendirildi."
-            },
-            {
-              id: "n2",
-              date: "2026-07-23",
-              content: "Kaynak istasyonunda 15 dakikalık standart sapma belirlendi, fikstür revize edilecek."
             }
           ]
         }
@@ -64,15 +60,15 @@
       }, [darkMode]);
 
       useEffect(() => {
-        const savedTasks = localStorage.getItem("my_workspace_tasks_v4");
-        const savedTopics = localStorage.getItem("my_workspace_topics_v4");
+        const savedTasks = localStorage.getItem("my_workspace_tasks_v5");
+        const savedTopics = localStorage.getItem("my_workspace_topics_v5");
         const today = new Date().toISOString().split("T")[0];
         
         if (savedTasks) setTasks(JSON.parse(savedTasks));
         else {
           setTasks([
-            { id: "1", title: "Dünkü kontrol ve aksiyon takibi", date: today, completed: false, priority: "Yüksek", category: "Üretim" },
-            { id: "2", title: "Montaj ve kaynak süreleri raporu", date: today, completed: false, priority: "Orta", category: "Kalite" }
+            { id: "1", title: "Dünkü kontrol ve aksiyon takibi", date: today, completed: false, priority: "Yüksek", category: "Üretim", image: null },
+            { id: "2", title: "Montaj ve kaynak süreleri raporu", date: today, completed: false, priority: "Orta", category: "Kalite", image: null }
           ]);
         }
 
@@ -80,12 +76,24 @@
       }, []);
 
       useEffect(() => {
-        if (tasks.length > 0) localStorage.setItem("my_workspace_tasks_v4", JSON.stringify(tasks));
+        if (tasks.length > 0) localStorage.setItem("my_workspace_tasks_v5", JSON.stringify(tasks));
       }, [tasks]);
 
       useEffect(() => {
-        localStorage.setItem("my_workspace_topics_v4", JSON.stringify(meetingTopics));
+        localStorage.setItem("my_workspace_topics_v5", JSON.stringify(meetingTopics));
       }, [meetingTopics]);
+
+      // Görsel Dosyası Seçme İşlemi
+      const handleImageSelect = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setSelectedImage(reader.result);
+          };
+          reader.readAsDataURL(file);
+        }
+      };
 
       const toggleListening = () => {
         if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
@@ -114,17 +122,19 @@
 
       const addTask = (titleToUse) => {
         const title = titleToUse || newTaskTitle;
-        if (!title.trim()) return;
+        if (!title.trim() && !selectedImage) return;
         const newTask = {
           id: Date.now().toString(),
-          title: title,
+          title: title || "Görsel Not",
           date: selectedDate,
           completed: false,
           priority: newTaskPriority,
-          category: newTaskCategory
+          category: newTaskCategory,
+          image: selectedImage
         };
         setTasks([newTask, ...tasks]);
         if (!titleToUse) setNewTaskTitle("");
+        setSelectedImage(null);
         setTranscript("");
       };
 
@@ -194,6 +204,15 @@
       return (
         <div className="max-w-md mx-auto min-h-screen flex flex-col pb-12">
           
+          {/* GİZLİ RESİM/DOSYA GİRDİSİ */}
+          <input 
+            type="file" 
+            accept="image/*" 
+            ref={fileInputRef} 
+            onChange={handleImageSelect} 
+            className="hidden" 
+          />
+
           {/* HEADER */}
           <header className="p-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-20">
             <div className="flex items-center gap-2">
@@ -322,21 +341,33 @@
               </button>
 
               <button
-                onClick={() => alert("Görsel ekleme modu aktif.")}
-                className="p-2.5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-sm flex flex-col items-center gap-1 text-center"
+                onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                className="p-2.5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-sm flex flex-col items-center gap-1 text-center relative"
               >
                 <span className="text-lg">📷</span>
                 <span className="text-[10px] font-semibold">Resim Ekle</span>
+                {selectedImage && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-blue-500"></span>}
               </button>
 
               <button
-                onClick={() => alert("Dosya ekleme modu aktif.")}
+                onClick={() => fileInputRef.current && fileInputRef.current.click()}
                 className="p-2.5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-sm flex flex-col items-center gap-1 text-center"
               >
                 <span className="text-lg">📎</span>
                 <span className="text-[10px] font-semibold">Dosya Ekle</span>
               </button>
             </section>
+
+            {/* SEÇİLEN RESİM ÖNİZLEMESİ */}
+            {selectedImage && (
+              <div className="bg-white dark:bg-slate-800 p-2.5 rounded-2xl border border-blue-200 dark:border-blue-800 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <img src={selectedImage} alt="Seçilen" className="w-10 h-10 object-cover rounded-lg" />
+                  <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">Görsel Eklendi</span>
+                </div>
+                <button onClick={() => setSelectedImage(null)} className="text-red-500 text-xs px-2 py-1 font-bold">Kaldır</button>
+              </div>
+            )}
 
             {/* SES METNİ */}
             {transcript && (
@@ -418,6 +449,12 @@
                             <span className={`text-xs font-medium truncate ${task.completed ? "line-through text-slate-400" : "text-slate-800 dark:text-slate-100"}`}>
                               {task.title}
                             </span>
+                            
+                            {/* YÜKLENEN RESİM VARSA GÖSTERİMİ */}
+                            {task.image && (
+                              <img src={task.image} alt="Task" className="w-20 h-20 object-cover rounded-lg mt-2 border border-slate-200 dark:border-slate-700" />
+                            )}
+
                             <div className="flex gap-1 mt-1">
                               <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-semibold ${getPriorityBadge(task.priority)}`}>
                                 {task.priority}
@@ -439,10 +476,9 @@
               </div>
             )}
 
-            {/* İÇERİK 2: KONU BAZLI TOPLANTILAR (YENİ DİZAYN) */}
+            {/* İÇERİK 2: KONU BAZLI TOPLANTILAR */}
             {activeTab === "meetings" && (
               <div className="space-y-3">
-                {/* YENİ TOPLANTI ANA BAŞLIĞI OLUŞTURMA */}
                 <section className="bg-white dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700/60 shadow-sm space-y-2">
                   <h3 className="text-xs font-bold text-slate-700 dark:text-slate-200">
                     📁 Yeni Toplantı Ana Başlığı (Proje / Konu)
@@ -473,14 +509,12 @@
                   </div>
                 </section>
 
-                {/* TOPLANTI BAŞLIKLARI LİSTESİ */}
                 <div className="space-y-3">
                   {meetingTopics.map((topic) => {
                     const isExpanded = selectedTopicId === topic.id;
 
                     return (
                       <div key={topic.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700/60 shadow-sm overflow-hidden">
-                        {/* BAŞLIK KARTI HEADER */}
                         <div 
                           onClick={() => setSelectedTopicId(isExpanded ? null : topic.id)}
                           className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/30 transition"
@@ -495,11 +529,8 @@
                           <span className="text-slate-400 text-xs">{isExpanded ? "▲" : "▼"}</span>
                         </div>
 
-                        {/* BAŞLIK DETAYI & TARİHLİ NOTLAR (AÇILIR KAPANIR) */}
                         {isExpanded && (
                           <div className="p-3.5 pt-0 border-t border-slate-100 dark:border-slate-700/50 space-y-3 bg-slate-50/50 dark:bg-slate-800/50">
-                            
-                            {/* BU BAŞLIĞA YENİ TARİHLİ NOT EKLEME */}
                             <div className="mt-3 space-y-2">
                               <label className="text-[10px] font-bold text-blue-600 dark:text-blue-400 block">
                                 ➕ ({selectedDate}) Tarihi İle Bu Başlığa Yeni Not Ekle:
@@ -519,7 +550,6 @@
                               </button>
                             </div>
 
-                            {/* GEÇMİŞ NOTLAR SİLSİLESİ */}
                             <div className="space-y-2 mt-2">
                               <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Geçmiş Toplantı Notları</h5>
                               {topic.notes.length === 0 ? (
