@@ -10,6 +10,35 @@
   <script>
     tailwind.config = { darkMode: 'class' }
   </script>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { 
+      getFirestore, 
+      collection, 
+      onSnapshot, 
+      doc, 
+      setDoc, 
+      deleteDoc 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAElv1iaPxHPiWqDXkSOsZBw86S4WCPov4",
+      authDomain: "is-asistanim.firebaseapp.com",
+      projectId: "is-asistanim",
+      storageBucket: "is-asistanim.firebasestorage.app",
+      messagingSenderId: "385268930352",
+      appId: "1:385268930352:web:78f65dc5e09622a657daf5",
+      measurementId: "G-X1VVE26CE9"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Global erişim için window nesnesine ekliyoruz
+    window.db = db;
+    window.dbFuncs = { collection, onSnapshot, doc, setDoc, deleteDoc };
+  </script>
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans antialiased min-h-screen">
   <div id="root"></div>
@@ -46,46 +75,60 @@
 
       const [searchQuery, setSearchQuery] = useState("");
       const [isListening, setIsListening] = useState(false);
+      const [isSyncing, setIsSyncing] = useState(true);
 
       useEffect(() => {
         if (darkMode) document.documentElement.classList.add('dark');
         else document.documentElement.classList.remove('dark');
       }, [darkMode]);
 
+      // Firebase Anlık Senkronizasyon Bağlantısı
       useEffect(() => {
-        const today = new Date().toISOString().split("T")[0];
-        try {
-          const savedTasks = localStorage.getItem("my_workspace_tasks_v8");
-          if (savedTasks) {
-            setTasks(JSON.parse(savedTasks));
-          } else {
-            setTasks([
-              { id: "1", title: "Kontrol ve aksiyon takibi", date: today, completed: false, priority: "Yüksek", category: "Üretim", image: null }
-            ]);
-          }
+        const checkDb = setInterval(() => {
+          if (window.db && window.dbFuncs) {
+            clearInterval(checkDb);
+            const { collection, onSnapshot } = window.dbFuncs;
 
-          const savedTopics = localStorage.getItem("my_workspace_topics_v8");
-          if (savedTopics) {
-            setMeetingTopics(JSON.parse(savedTopics));
-          } else {
-            setMeetingTopics([]);
+            // Görevleri Anlık Dinle
+            const unsubTasks = onSnapshot(collection(window.db, "tasks"), (snapshot) => {
+              const loadedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+              setTasks(loadedTasks);
+              setIsSyncing(false);
+            });
+
+            // Toplantı Konularını Anlık Dinle
+            const unsubTopics = onSnapshot(collection(window.db, "topics"), (snapshot) => {
+              const loadedTopics = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+              setMeetingTopics(loadedTopics);
+            });
+
+            return () => {
+              unsubTasks();
+              unsubTopics();
+            };
           }
-        } catch (err) {
-          console.error(err);
-        }
+        }, 300);
+
+        return () => clearInterval(checkDb);
       }, []);
 
-      useEffect(() => {
-        try {
-          if (tasks.length > 0) localStorage.setItem("my_workspace_tasks_v8", JSON.stringify(tasks));
-        } catch (e) {}
-      }, [tasks]);
+      const saveTaskToFirebase = async (taskObj) => {
+        if (!window.db) return;
+        const { doc, setDoc } = window.dbFuncs;
+        await setDoc(doc(window.db, "tasks", taskObj.id), taskObj);
+      };
 
-      useEffect(() => {
-        try {
-          if (meetingTopics.length > 0) localStorage.setItem("my_workspace_topics_v8", JSON.stringify(meetingTopics));
-        } catch (e) {}
-      }, [meetingTopics]);
+      const deleteTaskFromFirebase = async (id) => {
+        if (!window.db) return;
+        const { doc, deleteDoc } = window.dbFuncs;
+        await deleteDoc(doc(window.db, "tasks", id));
+      };
+
+      const saveTopicToFirebase = async (topicObj) => {
+        if (!window.db) return;
+        const { doc, setDoc } = window.dbFuncs;
+        await setDoc(doc(window.db, "topics", topicObj.id), topicObj);
+      };
 
       const handleImageSelect = (evt) => {
         const file = evt.target.files && evt.target.files[0];
@@ -94,34 +137,6 @@
           reader.onloadend = () => setSelectedImage(reader.result);
           reader.readAsDataURL(file);
         }
-      };
-
-      const exportData = () => {
-        const data = { tasks, meetingTopics };
-        const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(data))}`;
-        const downloadAnchor = document.createElement("a");
-        downloadAnchor.setAttribute("href", jsonString);
-        downloadAnchor.setAttribute("download", `IsAsistanim_Yedek_${selectedDate}.json`);
-        document.body.appendChild(downloadAnchor);
-        downloadAnchor.click();
-        downloadAnchor.remove();
-      };
-
-      const importData = (evt) => {
-        const file = evt.target.files && evt.target.files[0];
-        if (!file) return;
-        const fileReader = new FileReader();
-        fileReader.readAsText(file, "UTF-8");
-        fileReader.onload = (event) => {
-          try {
-            const parsed = JSON.parse(event.target.result);
-            if (parsed.tasks) setTasks(parsed.tasks);
-            if (parsed.meetingTopics) setMeetingTopics(parsed.meetingTopics);
-            alert("Veriler başarıyla yüklendi!");
-          } catch (err) {
-            alert("Hatalı dosya formatı.");
-          }
-        };
       };
 
       const toggleListening = () => {
@@ -161,7 +176,8 @@
           category: newTaskCategory || "Üretim",
           image: selectedImage
         };
-        setTasks([newTask, ...tasks]);
+        
+        saveTaskToFirebase(newTask);
         setNewTaskTitle("");
         setSelectedImage(null);
         setShowAddForm(false);
@@ -175,30 +191,40 @@
       };
 
       const saveEditing = (id) => {
-        setTasks(tasks.map(t => t.id === id ? { ...t, title: editTitle, priority: editPriority, category: editCategory } : t));
+        const existing = tasks.find(t => t.id === id);
+        if (existing) {
+          const updated = { ...existing, title: editTitle, priority: editPriority, category: editCategory };
+          saveTaskToFirebase(updated);
+        }
         setEditingTaskId(null);
       };
 
-      const toggleTask = (id) => setTasks(tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
-      const deleteTask = (id) => setTasks(tasks.filter(t => t.id !== id));
+      const toggleTask = (id) => {
+        const existing = tasks.find(t => t.id === id);
+        if (existing) {
+          saveTaskToFirebase({ ...existing, completed: !existing.completed });
+        }
+      };
+
+      const deleteTask = (id) => deleteTaskFromFirebase(id);
 
       const addMeetingTopic = () => {
         if (!newTopicTitle.trim()) return;
-        setMeetingTopics([{ id: "top_" + Date.now(), title: newTopicTitle, notes: [] }, ...meetingTopics]);
+        const newTopic = { id: "top_" + Date.now(), title: newTopicTitle, notes: [] };
+        saveTopicToFirebase(newTopic);
         setNewTopicTitle("");
       };
 
       const addNoteToTopic = (topicId) => {
         if (!newNoteContent.trim()) return;
-        setMeetingTopics(meetingTopics.map(top => {
-          if (top.id === topicId) {
-            return {
-              ...top,
-              notes: [{ id: "note_" + Date.now(), date: selectedDate, content: newNoteContent }, ...(top.notes || [])]
-            };
-          }
-          return top;
-        }));
+        const existing = meetingTopics.find(top => top.id === topicId);
+        if (existing) {
+          const updated = {
+            ...existing,
+            notes: [{ id: "note_" + Date.now(), date: selectedDate, content: newNoteContent }, ...(existing.notes || [])]
+          };
+          saveTopicToFirebase(updated);
+        }
         setNewNoteContent("");
       };
 
@@ -236,7 +262,6 @@
 
       return e("div", { className: "max-w-md mx-auto min-h-screen flex flex-col pb-10" },
         e("input", { type: "file", accept: "image/*", ref: fileInputRef, onChange: handleImageSelect, className: "hidden" }),
-        e("input", { type: "file", accept: ".json", ref: importInputRef, onChange: importData, className: "hidden" }),
 
         // Header
         e("header", { className: "p-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 sticky top-0 z-30" },
@@ -244,12 +269,10 @@
             e("div", { className: "w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-sm" }, "⚡"),
             e("div", null,
               e("h1", { className: "font-bold text-sm text-slate-900 dark:text-white" }, "İş Asistanım"),
-              e("p", { className: "text-[10px] text-slate-400" }, "Kişisel Görev & Not Yönetimi")
+              e("p", { className: "text-[10px] text-slate-400" }, isSyncing ? "🔄 Senkronize ediliyor..." : "☁️ Canlı Bulut Senkronize")
             )
           ),
           e("div", { className: "flex items-center gap-1.5" },
-            e("button", { onClick: exportData, title: "Yedek İndir", className: "p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs" }, "📤"),
-            e("button", { onClick: () => importInputRef.current && importInputRef.current.click(), title: "Yedek Yükle", className: "p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs" }, "📥"),
             e("button", { onClick: () => setDarkMode(!darkMode), className: "p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs" }, darkMode ? "☀️" : "🌙")
           )
         ),
