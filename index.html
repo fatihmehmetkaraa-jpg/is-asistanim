@@ -48,7 +48,7 @@
     const e = React.createElement;
     const { useState, useEffect, useRef } = React;
 
-    // Resim Boyutlandırma / Sıkıştırma Fonksiyonu (Firebase 1MB Sınırı İçin)
+    // Resim Sıkıştırma Fonksiyonu
     const compressImage = (file, maxWidth = 800, quality = 0.7, callback) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -84,9 +84,12 @@
       const [activeTab, setActiveTab] = useState("daily");
       const [selectedDate, setSelectedDate] = useState(todayISO);
 
-      // Klasör ve Oturum Seviye Mantığı
+      // Klasör ve Oturum
       const [selectedFolderId, setSelectedFolderId] = useState(null);
       const [selectedSessionId, setSelectedSessionId] = useState(null);
+
+      // Resim Onizleme Modal State
+      const [previewImageUrl, setPreviewImageUrl] = useState(null);
 
       // Ref'ler
       const taskFileInputRef = useRef(null);
@@ -113,7 +116,6 @@
       const [isListeningNote, setIsListeningNote] = useState(false);
       const [isSyncing, setIsSyncing] = useState(true);
 
-      // Tarih Şeridi Oluşturucu
       const generateDateList = () => {
         const dates = [];
         const base = new Date();
@@ -135,7 +137,6 @@
         else document.documentElement.classList.remove('dark');
       }, [darkMode]);
 
-      // Firebase Dinleyici
       useEffect(() => {
         const checkDb = setInterval(() => {
           if (window.db && window.dbFuncs) {
@@ -187,7 +188,6 @@
         await setDoc(doc(window.db, "topics", topicObj.id), topicObj);
       };
 
-      // Dikte
       const toggleListeningTask = () => {
         if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) return alert("Tarayıcı desteği yok.");
         if (isListeningTask) setIsListeningTask(false);
@@ -357,11 +357,28 @@
 
       const activeFolderObj = meetingTopics.find(f => f.id === selectedFolderId);
       const activeSessionObj = activeFolderObj?.sessions?.find(s => s.id === selectedSessionId);
-
       const filteredTasks = tasks.filter(t => t.date === selectedDate);
 
-      return e("div", { className: "max-w-md mx-auto min-h-screen flex flex-col pb-12" },
-        // Görev Resim Yükleyici (Sıkıştırma ve Otomatik Form Açma Entegre Edildi)
+      return e("div", { className: "max-w-md mx-auto min-h-screen flex flex-col pb-12 relative" },
+        
+        // TAM EKRAN RESİM İNCELEME MODALI
+        previewImageUrl && e("div", {
+          className: "fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm",
+          onClick: () => setPreviewImageUrl(null)
+        },
+          e("div", { className: "relative max-w-full max-h-full flex flex-col items-center" },
+            e("button", {
+              onClick: () => setPreviewImageUrl(null),
+              className: "absolute -top-10 right-0 text-white bg-slate-800/80 p-2 rounded-full text-xs font-bold w-8 h-8 flex items-center justify-center shadow-lg"
+            }, "✕"),
+            e("img", {
+              src: previewImageUrl,
+              className: "max-w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl border border-white/20"
+            })
+          )
+        ),
+
+        // File Inputs
         e("input", { 
           type: "file", 
           accept: "image/*", 
@@ -371,14 +388,13 @@
             if (file) {
               compressImage(file, 800, 0.7, (compressedBase64) => {
                 setSelectedTaskImage(compressedBase64);
-                setShowAddForm(true); // Formu otomatik aç
+                setShowAddForm(true);
               });
             }
           }, 
           className: "hidden" 
         }),
         
-        // Toplantı Resim Yükleyici (Sıkıştırma Entegre Edildi)
         e("input", { 
           type: "file", 
           accept: "image/*", 
@@ -408,7 +424,7 @@
 
         e("main", { className: "p-3 space-y-3" },
           
-          // Tab Anahtarı
+          // Tab Switcher
           e("div", { className: "flex bg-slate-200/80 dark:bg-slate-800/80 p-1 rounded-2xl gap-1 text-xs font-black" },
             e("button", {
               onClick: () => { setActiveTab("daily"); setSelectedFolderId(null); setSelectedSessionId(null); },
@@ -423,7 +439,6 @@
           /* ---------------- 1. GÜNLÜK GÖREVLER ---------------- */
           activeTab === "daily" && e("div", { className: "space-y-3" },
             
-            /* MAVİ TEMA YATAY TARİH ŞERİDİ */
             e("div", { className: "bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-3 rounded-2xl shadow-md space-y-2" },
               e("div", { className: "flex items-center justify-between text-xs font-black" },
                 e("span", { className: "opacity-90" }, "📅 Tarih Seçimi"),
@@ -463,7 +478,6 @@
             showAddForm && e("div", { className: "p-3 bg-white dark:bg-slate-900 rounded-2xl border space-y-2 shadow-xs" },
               e("input", { type: "text", placeholder: "Görev tanımı...", value: newTaskTitle, onChange: (ev) => setNewTaskTitle(ev.target.value), className: "w-full p-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs outline-none" }),
               
-              // Seçilen Resim Önizleme Alanı
               selectedTaskImage && e("div", { className: "relative w-20 h-20 my-1" },
                 e("img", { src: selectedTaskImage, className: "w-full h-full object-cover rounded-xl border" }),
                 e("button", { onClick: () => setSelectedTaskImage(null), className: "absolute -top-1.5 -right-1.5 bg-rose-500 text-white w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shadow" }, "✕")
@@ -487,14 +501,17 @@
                 e("button", { onClick: () => deleteTaskFromFirebase(task.id), className: "text-slate-400 text-xs px-1" }, "🗑️")
               ),
               
-              // Göreve Eklenmiş Görsel Kartı
-              task.image && e("a", { href: task.image, target: "_blank", className: "inline-block" },
-                e("img", { src: task.image, className: "w-20 h-16 object-cover rounded-lg border ml-6" })
+              // Uygulama içi Resim Açıcı Tıklama Olayı
+              task.image && e("div", { 
+                onClick: () => setPreviewImageUrl(task.image), 
+                className: "cursor-pointer inline-block ml-6" 
+              },
+                e("img", { src: task.image, className: "w-20 h-16 object-cover rounded-lg border hover:opacity-80 transition-all" })
               )
             ))
           ),
 
-          /* ---------------- 2. TOPLANTI MİMARİSİ (Aynen Korundu) ---------------- */
+          /* ---------------- 2. TOPLANTI KONULARI ---------------- */
           activeTab === "meetings" && e("div", { className: "space-y-3" },
 
             !selectedFolderId && e("div", { className: "space-y-3" },
@@ -641,15 +658,19 @@
                     e("button", {
                       onClick: () => {
                         addTask(`[${activeFolderObj.title} - ${activeSessionObj.title}] ${note.content}`);
-                        alert("Görevere aktarıldı!");
+                        alert("Görevlere aktarıldı!");
                       },
                       className: "text-[10px] font-bold text-blue-600 hover:underline"
                     }, "➡️ Görev Yap")
                   ),
                   e("p", { className: "text-xs font-semibold text-slate-800 dark:text-slate-100 leading-snug" }, note.content),
                   
-                  note.image && e("a", { href: note.image, target: "_blank", className: "inline-block mt-1" },
-                    e("img", { src: note.image, className: "w-16 h-12 object-cover rounded-lg border" })
+                  // Toplantı Notundaki Resim İçin Uygulama İçi Resim Açıcı
+                  note.image && e("div", { 
+                    onClick: () => setPreviewImageUrl(note.image), 
+                    className: "cursor-pointer inline-block mt-1" 
+                  },
+                    e("img", { src: note.image, className: "w-16 h-12 object-cover rounded-lg border hover:opacity-80 transition-all" })
                   )
                 ))
               )
