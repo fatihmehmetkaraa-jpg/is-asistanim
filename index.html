@@ -13,7 +13,6 @@
     tailwind.config = { darkMode: 'class' }
   </script>
 
-  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { 
@@ -48,6 +47,35 @@
   <script>
     const e = React.createElement;
     const { useState, useEffect, useRef } = React;
+
+    // Resim Boyutlandırma / Sıkıştırma Fonksiyonu (Firebase 1MB Sınırı İçin)
+    const compressImage = (file, maxWidth = 800, quality = 0.7, callback) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+          callback(compressedDataUrl);
+        };
+      };
+    };
 
     function App() {
       const todayISO = new Date().toISOString().split("T")[0];
@@ -85,7 +113,7 @@
       const [isListeningNote, setIsListeningNote] = useState(false);
       const [isSyncing, setIsSyncing] = useState(true);
 
-      // Tarih Şeridi Oluşturucu (Son 3 gün, Bugün, Gelecek 7 gün)
+      // Tarih Şeridi Oluşturucu
       const generateDateList = () => {
         const dates = [];
         const base = new Date();
@@ -333,23 +361,38 @@
       const filteredTasks = tasks.filter(t => t.date === selectedDate);
 
       return e("div", { className: "max-w-md mx-auto min-h-screen flex flex-col pb-12" },
-        e("input", { type: "file", accept: "image/*", ref: taskFileInputRef, onChange: (ev) => {
-          const file = ev.target.files && ev.target.files[0];
-          if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => setSelectedTaskImage(reader.result);
-            reader.readAsDataURL(file);
-          }
-        }, className: "hidden" }),
+        // Görev Resim Yükleyici (Sıkıştırma ve Otomatik Form Açma Entegre Edildi)
+        e("input", { 
+          type: "file", 
+          accept: "image/*", 
+          ref: taskFileInputRef, 
+          onChange: (ev) => {
+            const file = ev.target.files && ev.target.files[0];
+            if (file) {
+              compressImage(file, 800, 0.7, (compressedBase64) => {
+                setSelectedTaskImage(compressedBase64);
+                setShowAddForm(true); // Formu otomatik aç
+              });
+            }
+          }, 
+          className: "hidden" 
+        }),
         
-        e("input", { type: "file", accept: "image/*", ref: meetingFileInputRef, onChange: (ev) => {
-          const file = ev.target.files && ev.target.files[0];
-          if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => setSelectedMeetingImage(reader.result);
-            reader.readAsDataURL(file);
-          }
-        }, className: "hidden" }),
+        // Toplantı Resim Yükleyici (Sıkıştırma Entegre Edildi)
+        e("input", { 
+          type: "file", 
+          accept: "image/*", 
+          ref: meetingFileInputRef, 
+          onChange: (ev) => {
+            const file = ev.target.files && ev.target.files[0];
+            if (file) {
+              compressImage(file, 800, 0.7, (compressedBase64) => {
+                setSelectedMeetingImage(compressedBase64);
+              });
+            }
+          }, 
+          className: "hidden" 
+        }),
 
         // Header
         e("header", { className: "p-3.5 flex items-center justify-between backdrop-blur-xl bg-white/90 dark:bg-slate-900/90 sticky top-0 z-30 border-b border-slate-200 dark:border-slate-800 shadow-xs" },
@@ -380,7 +423,7 @@
           /* ---------------- 1. GÜNLÜK GÖREVLER ---------------- */
           activeTab === "daily" && e("div", { className: "space-y-3" },
             
-            /* KURUMSAL MAVİ TEMA YATAY TARİH ŞERİDİ */
+            /* MAVİ TEMA YATAY TARİH ŞERİDİ */
             e("div", { className: "bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-3 rounded-2xl shadow-md space-y-2" },
               e("div", { className: "flex items-center justify-between text-xs font-black" },
                 e("span", { className: "opacity-90" }, "📅 Tarih Seçimi"),
@@ -417,23 +460,37 @@
               e("button", { onClick: () => taskFileInputRef.current && taskFileInputRef.current.click(), className: "py-2.5 bg-white dark:bg-slate-900 border rounded-xl font-extrabold text-xs" }, "📷 Resim")
             ),
 
-            showAddForm && e("div", { className: "p-3 bg-white dark:bg-slate-900 rounded-2xl border space-y-2" },
+            showAddForm && e("div", { className: "p-3 bg-white dark:bg-slate-900 rounded-2xl border space-y-2 shadow-xs" },
               e("input", { type: "text", placeholder: "Görev tanımı...", value: newTaskTitle, onChange: (ev) => setNewTaskTitle(ev.target.value), className: "w-full p-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs outline-none" }),
+              
+              // Seçilen Resim Önizleme Alanı
+              selectedTaskImage && e("div", { className: "relative w-20 h-20 my-1" },
+                e("img", { src: selectedTaskImage, className: "w-full h-full object-cover rounded-xl border" }),
+                e("button", { onClick: () => setSelectedTaskImage(null), className: "absolute -top-1.5 -right-1.5 bg-rose-500 text-white w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shadow" }, "✕")
+              ),
+
               e("button", { onClick: () => addTask(), className: "w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-bold" }, "Kaydet")
             ),
 
             filteredTasks.map(task => e("div", { 
               key: task.id, 
-              className: "p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2" 
+              className: "p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col gap-2" 
             },
-              e("div", { className: "flex items-center gap-2 flex-1" },
-                e("button", {
-                  onClick: () => toggleTask(task.id),
-                  className: `w-4 h-4 rounded border flex items-center justify-center text-xs font-bold ${task.completed ? "bg-blue-600 text-white border-blue-600" : "border-slate-400"}`
-                }, task.completed ? "✓" : ""),
-                e("span", { className: `text-xs font-semibold ${task.completed ? "line-through text-slate-400" : ""}` }, task.title)
+              e("div", { className: "flex items-center justify-between gap-2" },
+                e("div", { className: "flex items-center gap-2 flex-1" },
+                  e("button", {
+                    onClick: () => toggleTask(task.id),
+                    className: `w-4 h-4 rounded border flex items-center justify-center text-xs font-bold ${task.completed ? "bg-blue-600 text-white border-blue-600" : "border-slate-400"}`
+                  }, task.completed ? "✓" : ""),
+                  e("span", { className: `text-xs font-semibold ${task.completed ? "line-through text-slate-400" : ""}` }, task.title)
+                ),
+                e("button", { onClick: () => deleteTaskFromFirebase(task.id), className: "text-slate-400 text-xs px-1" }, "🗑️")
               ),
-              e("button", { onClick: () => deleteTaskFromFirebase(task.id), className: "text-slate-400 text-xs px-1" }, "🗑️")
+              
+              // Göreve Eklenmiş Görsel Kartı
+              task.image && e("a", { href: task.image, target: "_blank", className: "inline-block" },
+                e("img", { src: task.image, className: "w-20 h-16 object-cover rounded-lg border ml-6" })
+              )
             ))
           ),
 
