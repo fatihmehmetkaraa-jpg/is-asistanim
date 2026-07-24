@@ -1,686 +1,99 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>İş Asistanım PRO</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-
-  <script>
-    tailwind.config = { darkMode: 'class' }
-  </script>
-
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { 
-      getFirestore, 
-      collection, 
-      onSnapshot, 
-      doc, 
-      setDoc, 
-      deleteDoc 
-    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyAElv1iaPxHPiWqDXkSOsZBw86S4WCPov4",
-      authDomain: "is-asistanim.firebaseapp.com",
-      projectId: "is-asistanim",
-      storageBucket: "is-asistanim.firebasestorage.app",
-      messagingSenderId: "385268930352",
-      appId: "1:385268930352:web:78f65dc5e09622a657daf5",
-      measurementId: "G-X1VVE26CE9"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    window.db = db;
-    window.dbFuncs = { collection, onSnapshot, doc, setDoc, deleteDoc };
-  </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kişisel Verimlilik Paneli</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- SF Pro benzeri font ve Apple ikon hissiyatı için -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans antialiased min-h-screen">
-  <div id="root"></div>
+<body>
+    <div class="app-container">
+        <!-- Sol Menü / Sidebar -->
+        <aside class="sidebar">
+            <div class="profile-section">
+                <div class="avatar"><i class="fa-solid fa-user"></i></div>
+                <h2>Verimlilik Paneli</h2>
+            </div>
+            <nav class="nav-menu">
+                <button class="nav-btn active" onclick="switchTab('tasks')">
+                    <i class="fa-solid fa-check-square"></i> Görevler
+                </button>
+                <button class="nav-btn" onclick="switchTab('calendar')">
+                    <i class="fa-solid fa-calendar-days"></i> Takvim
+                </button>
+                <button class="nav-btn" onclick="switchTab('notes')">
+                    <i class="fa-solid fa-note-sticky"></i> Toplantı Notları
+                </button>
+            </nav>
+        </aside>
 
-  <script>
-    const e = React.createElement;
-    const { useState, useEffect, useRef } = React;
-
-    // Resim Sıkıştırma Fonksiyonu
-    const compressImage = (file, maxWidth = 800, quality = 0.7, callback) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target.result;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-
-          if (width > maxWidth) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
-          callback(compressedDataUrl);
-        };
-      };
-    };
-
-    function App() {
-      const todayISO = new Date().toISOString().split("T")[0];
-
-      const [darkMode, setDarkMode] = useState(false);
-      const [activeTab, setActiveTab] = useState("daily");
-      const [selectedDate, setSelectedDate] = useState(todayISO);
-
-      // Klasör ve Oturum
-      const [selectedFolderId, setSelectedFolderId] = useState(null);
-      const [selectedSessionId, setSelectedSessionId] = useState(null);
-
-      // Resim Onizleme Modal State
-      const [previewImageUrl, setPreviewImageUrl] = useState(null);
-
-      // Ref'ler
-      const taskFileInputRef = useRef(null);
-      const [selectedTaskImage, setSelectedTaskImage] = useState(null);
-
-      const meetingFileInputRef = useRef(null);
-      const [selectedMeetingImage, setSelectedMeetingImage] = useState(null);
-
-      // Data State
-      const [tasks, setTasks] = useState([]);
-      const [meetingTopics, setMeetingTopics] = useState([]);
-
-      // Form State'leri
-      const [showAddForm, setShowAddForm] = useState(false);
-      const [newTaskTitle, setNewTaskTitle] = useState("");
-      const [newTaskPriority, setNewTaskPriority] = useState("Yüksek");
-
-      const [newMeetingTitle, setNewMeetingTitle] = useState("");
-      const [newSessionDate, setNewSessionDate] = useState(todayISO);
-      const [newNoteContent, setNewNoteContent] = useState("");
-      const [newNoteAssignee, setNewNoteAssignee] = useState("");
-
-      const [isListeningTask, setIsListeningTask] = useState(false);
-      const [isListeningNote, setIsListeningNote] = useState(false);
-      const [isSyncing, setIsSyncing] = useState(true);
-
-      const generateDateList = () => {
-        const dates = [];
-        const base = new Date();
-        for (let i = -3; i <= 7; i++) {
-          const d = new Date(base);
-          d.setDate(base.getDate() + i);
-          const iso = d.toISOString().split("T")[0];
-          const dayName = d.toLocaleDateString("tr-TR", { weekday: "short" });
-          const dayNum = d.getDate();
-          dates.push({ iso, dayName, dayNum });
-        }
-        return dates;
-      };
-
-      const dateList = generateDateList();
-
-      useEffect(() => {
-        if (darkMode) document.documentElement.classList.add('dark');
-        else document.documentElement.classList.remove('dark');
-      }, [darkMode]);
-
-      useEffect(() => {
-        const checkDb = setInterval(() => {
-          if (window.db && window.dbFuncs) {
-            clearInterval(checkDb);
-            const { collection, onSnapshot } = window.dbFuncs;
-
-            const unsubTasks = onSnapshot(collection(window.db, "tasks"), (snapshot) => {
-              const loadedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-              
-              const updatedTasks = loadedTasks.map(task => {
-                if (!task.completed && task.date < todayISO) {
-                  const rolledTask = { ...task, date: todayISO, isRollover: true };
-                  saveTaskToFirebase(rolledTask);
-                  return rolledTask;
-                }
-                return task;
-              });
-
-              setTasks(updatedTasks);
-              setIsSyncing(false);
-            });
-
-            const unsubTopics = onSnapshot(collection(window.db, "topics"), (snapshot) => {
-              const loadedTopics = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-              setMeetingTopics(loadedTopics);
-            });
-
-            return () => { unsubTasks(); unsubTopics(); };
-          }
-        }, 300);
-        return () => clearInterval(checkDb);
-      }, []);
-
-      const saveTaskToFirebase = async (taskObj) => {
-        if (!window.db) return;
-        const { doc, setDoc } = window.dbFuncs;
-        await setDoc(doc(window.db, "tasks", taskObj.id), taskObj);
-      };
-
-      const deleteTaskFromFirebase = async (id) => {
-        if (!window.db) return;
-        const { doc, deleteDoc } = window.dbFuncs;
-        await deleteDoc(doc(window.db, "tasks", id));
-      };
-
-      const saveTopicToFirebase = async (topicObj) => {
-        if (!window.db) return;
-        const { doc, setDoc } = window.dbFuncs;
-        await setDoc(doc(window.db, "topics", topicObj.id), topicObj);
-      };
-
-      const toggleListeningTask = () => {
-        if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) return alert("Tarayıcı desteği yok.");
-        if (isListeningTask) setIsListeningTask(false);
-        else {
-          setIsListeningTask(true);
-          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-          const recognition = new SpeechRecognition();
-          recognition.lang = "tr-TR";
-          recognition.onresult = (ev) => {
-            setNewTaskTitle(ev.results[0][0].transcript);
-            setIsListeningTask(false);
-            setShowAddForm(true);
-          };
-          recognition.onend = () => setIsListeningTask(false);
-          recognition.start();
-        }
-      };
-
-      const toggleListeningNote = () => {
-        if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) return alert("Tarayıcı desteği yok.");
-        if (isListeningNote) setIsListeningNote(false);
-        else {
-          setIsListeningNote(true);
-          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-          const recognition = new SpeechRecognition();
-          recognition.lang = "tr-TR";
-          recognition.onresult = (ev) => {
-            const text = ev.results[0][0].transcript;
-            setNewNoteContent((prev) => (prev ? prev + " " + text : text));
-            setIsListeningNote(false);
-          };
-          recognition.onend = () => setIsListeningNote(false);
-          recognition.start();
-        }
-      };
-
-      const addTask = (titleToUse) => {
-        const title = titleToUse || newTaskTitle;
-        if (!title.trim() && !selectedTaskImage) return;
-        const newTask = {
-          id: Date.now().toString(),
-          title: title || "Görsel Not",
-          date: selectedDate,
-          completed: false,
-          priority: newTaskPriority || "Yüksek",
-          category: "Üretim",
-          image: selectedTaskImage,
-          isRollover: false
-        };
-        saveTaskToFirebase(newTask);
-        setNewTaskTitle("");
-        setSelectedTaskImage(null);
-        setShowAddForm(false);
-      };
-
-      const toggleTask = (id) => {
-        const existing = tasks.find(t => t.id === id);
-        if (existing) saveTaskToFirebase({ ...existing, completed: !existing.completed });
-      };
-
-      const addMeetingFolder = () => {
-        if (!newMeetingTitle.trim()) return;
-        const newFolder = {
-          id: "folder_" + Date.now(),
-          title: newMeetingTitle,
-          sessions: []
-        };
-        saveTopicToFirebase(newFolder);
-        setNewMeetingTitle("");
-      };
-
-      const addSessionToFolder = (folderId) => {
-        const folder = meetingTopics.find(f => f.id === folderId);
-        if (!folder) return;
-
-        const currentSessions = folder.sessions || [];
-        const sessionNum = currentSessions.length + 1;
-
-        const newSession = {
-          id: "sess_" + Date.now(),
-          title: `${sessionNum}. Toplantı`,
-          date: newSessionDate,
-          notes: []
-        };
-
-        const updatedFolder = {
-          ...folder,
-          sessions: [newSession, ...currentSessions]
-        };
-
-        saveTopicToFirebase(updatedFolder);
-      };
-
-      const addNoteToSession = (folderId, sessionId) => {
-        if (!newNoteContent.trim() && !selectedMeetingImage) return;
-        const folder = meetingTopics.find(f => f.id === folderId);
-        if (!folder) return;
-
-        const updatedSessions = (folder.sessions || []).map(sess => {
-          if (sess.id === sessionId) {
-            return {
-              ...sess,
-              notes: [{
-                id: "n_" + Date.now(),
-                content: newNoteContent,
-                assignee: newNoteAssignee || "Atanmadı",
-                image: selectedMeetingImage,
-                date: todayISO
-              }, ...(sess.notes || [])]
-            };
-          }
-          return sess;
-        });
-
-        saveTopicToFirebase({ ...folder, sessions: updatedSessions });
-        setNewNoteContent("");
-        setNewNoteAssignee("");
-        setSelectedMeetingImage(null);
-      };
-
-      const exportSessionPDF = (folderTitle, session) => {
-        const element = document.createElement("div");
-        element.style.padding = "20px";
-        element.style.fontFamily = "Arial, sans-serif";
-
-        let notesHtml = (session.notes || []).map((n, idx) => `
-          <tr style="border-bottom: 1px solid #ddd;">
-            <td style="padding: 8px; font-weight: bold; width: 30px;">${idx + 1}.</td>
-            <td style="padding: 8px;">${n.content}</td>
-            <td style="padding: 8px; font-weight: bold; color: #2563eb;">${n.assignee}</td>
-            <td style="padding: 8px; color: #666; font-size: 10px;">${n.date}</td>
-          </tr>
-        `).join("");
-
-        element.innerHTML = `
-          <div style="border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; margin-bottom: 15px;">
-            <h2 style="color: #1e3a8a; margin: 0; font-size: 16px;">TOPLANTI TUTANAĞI</h2>
-            <p style="margin: 4px 0 0 0; color: #333; font-size: 12px;"><strong>Konu:</strong> ${folderTitle}</p>
-            <p style="margin: 2px 0 0 0; color: #333; font-size: 12px;"><strong>Oturum:</strong> ${session.title} (${session.date})</p>
-          </div>
-          
-          <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
-            <thead>
-              <tr style="background-color: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
-                <th style="padding: 6px;">#</th>
-                <th style="padding: 6px;">Karar / Not</th>
-                <th style="padding: 6px;">Sorumlu</th>
-                <th style="padding: 6px;">Tarih</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${notesHtml || '<tr><td colspan="4" style="padding:8px;">Kayıtlı karar yok.</td></tr>'}
-            </tbody>
-          </table>
-        `;
-
-        const opt = {
-          margin: 0.5,
-          filename: `${folderTitle}_${session.title}_Tutanak.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2 },
-          jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-        };
-
-        html2pdf().set(opt).from(element).save();
-      };
-
-      const activeFolderObj = meetingTopics.find(f => f.id === selectedFolderId);
-      const activeSessionObj = activeFolderObj?.sessions?.find(s => s.id === selectedSessionId);
-      const filteredTasks = tasks.filter(t => t.date === selectedDate);
-
-      return e("div", { className: "max-w-md mx-auto min-h-screen flex flex-col pb-12 relative" },
-        
-        // TAM EKRAN RESİM İNCELEME MODALI
-        previewImageUrl && e("div", {
-          className: "fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm",
-          onClick: () => setPreviewImageUrl(null)
-        },
-          e("div", { className: "relative max-w-full max-h-full flex flex-col items-center" },
-            e("button", {
-              onClick: () => setPreviewImageUrl(null),
-              className: "absolute -top-10 right-0 text-white bg-slate-800/80 p-2 rounded-full text-xs font-bold w-8 h-8 flex items-center justify-center shadow-lg"
-            }, "✕"),
-            e("img", {
-              src: previewImageUrl,
-              className: "max-w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl border border-white/20"
-            })
-          )
-        ),
-
-        // File Inputs
-        e("input", { 
-          type: "file", 
-          accept: "image/*", 
-          ref: taskFileInputRef, 
-          onChange: (ev) => {
-            const file = ev.target.files && ev.target.files[0];
-            if (file) {
-              compressImage(file, 800, 0.7, (compressedBase64) => {
-                setSelectedTaskImage(compressedBase64);
-                setShowAddForm(true);
-              });
-            }
-          }, 
-          className: "hidden" 
-        }),
-        
-        e("input", { 
-          type: "file", 
-          accept: "image/*", 
-          ref: meetingFileInputRef, 
-          onChange: (ev) => {
-            const file = ev.target.files && ev.target.files[0];
-            if (file) {
-              compressImage(file, 800, 0.7, (compressedBase64) => {
-                setSelectedMeetingImage(compressedBase64);
-              });
-            }
-          }, 
-          className: "hidden" 
-        }),
-
-        // Header
-        e("header", { className: "p-3.5 flex items-center justify-between backdrop-blur-xl bg-white/90 dark:bg-slate-900/90 sticky top-0 z-30 border-b border-slate-200 dark:border-slate-800 shadow-xs" },
-          e("div", { className: "flex items-center gap-2" },
-            e("div", { className: "w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-sm" }, "⚡"),
-            e("div", null,
-              e("h1", { className: "font-black text-xs tracking-tight text-slate-900 dark:text-white" }, "İş Asistanım PRO"),
-              e("span", { className: "text-[9px] font-bold text-slate-400 block -mt-0.5" }, isSyncing ? "Eşitleniyor..." : "Bulut Aktif")
-            )
-          ),
-          e("button", { onClick: () => setDarkMode(!darkMode), className: "p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs" }, darkMode ? "☀️" : "🌙")
-        ),
-
-        e("main", { className: "p-3 space-y-3" },
-          
-          // Tab Switcher
-          e("div", { className: "flex bg-slate-200/80 dark:bg-slate-800/80 p-1 rounded-2xl gap-1 text-xs font-black" },
-            e("button", {
-              onClick: () => { setActiveTab("daily"); setSelectedFolderId(null); setSelectedSessionId(null); },
-              className: `flex-1 py-2 rounded-xl transition-all ${activeTab === "daily" ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs" : "text-slate-500"}`
-            }, "☑️ Günlük Görevler"),
-            e("button", {
-              onClick: () => { setActiveTab("meetings"); setSelectedFolderId(null); setSelectedSessionId(null); },
-              className: `flex-1 py-2 rounded-xl transition-all ${activeTab === "meetings" ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs" : "text-slate-500"}`
-            }, "📁 Toplantı Konuları")
-          ),
-
-          /* ---------------- 1. GÜNLÜK GÖREVLER ---------------- */
-          activeTab === "daily" && e("div", { className: "space-y-3" },
+        <!-- Ana İçerik Alanı -->
+        <main class="main-content">
             
-            e("div", { className: "bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-3 rounded-2xl shadow-md space-y-2" },
-              e("div", { className: "flex items-center justify-between text-xs font-black" },
-                e("span", { className: "opacity-90" }, "📅 Tarih Seçimi"),
-                e("input", {
-                  type: "date",
-                  value: selectedDate,
-                  onChange: (ev) => setSelectedDate(ev.target.value),
-                  className: "bg-white/20 text-white placeholder-white text-[10px] px-2 py-0.5 rounded-lg border border-white/30 outline-none"
-                })
-              ),
-              e("div", { className: "flex gap-1.5 overflow-x-auto pb-1 scrollbar-none" },
-                dateList.map(item => {
-                  const isSelected = item.iso === selectedDate;
-                  const isToday = item.iso === todayISO;
-                  return e("button", {
-                    key: item.iso,
-                    onClick: () => setSelectedDate(item.iso),
-                    className: `flex-1 min-w-[50px] py-2 px-1 rounded-xl flex flex-col items-center justify-center transition-all ${
-                      isSelected 
-                        ? "bg-white text-blue-800 font-black shadow-lg scale-105" 
-                        : "bg-white/10 hover:bg-white/20 text-white font-medium"
-                    }`
-                  },
-                    e("span", { className: "text-[9px] uppercase tracking-wider opacity-80" }, isToday ? "Bugün" : item.dayName),
-                    e("span", { className: "text-sm font-black" }, item.dayNum)
-                  );
-                })
-              )
-            ),
+            <!-- GÖREVLER SEKMESİ -->
+            <section id="tasks" class="tab-content active">
+                <header class="section-header">
+                    <h1>Görevler</h1>
+                    <span class="date-badge" id="current-date"></span>
+                </header>
 
-            e("div", { className: "grid grid-cols-3 gap-1.5" },
-              e("button", { onClick: () => setShowAddForm(!showAddForm), className: "py-2.5 bg-blue-600 text-white rounded-xl font-extrabold text-xs" }, showAddForm ? "Kapat" : "➕ Görev"),
-              e("button", { onClick: toggleListeningTask, className: `py-2.5 border rounded-xl font-extrabold text-xs ${isListeningTask ? "bg-rose-500 text-white animate-pulse" : "bg-white dark:bg-slate-900"}` }, "🎙️ Sesle"),
-              e("button", { onClick: () => taskFileInputRef.current && taskFileInputRef.current.click(), className: "py-2.5 bg-white dark:bg-slate-900 border rounded-xl font-extrabold text-xs" }, "📷 Resim")
-            ),
+                <div class="card add-card">
+                    <input type="text" id="task-input" placeholder="Yeni bir görev ekleyin...">
+                    <button class="apple-btn" onclick="addTask()">Ekle</button>
+                </div>
 
-            showAddForm && e("div", { className: "p-3 bg-white dark:bg-slate-900 rounded-2xl border space-y-2 shadow-xs" },
-              e("input", { type: "text", placeholder: "Görev tanımı...", value: newTaskTitle, onChange: (ev) => setNewTaskTitle(ev.target.value), className: "w-full p-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs outline-none" }),
-              
-              selectedTaskImage && e("div", { className: "relative w-20 h-20 my-1" },
-                e("img", { src: selectedTaskImage, className: "w-full h-full object-cover rounded-xl border" }),
-                e("button", { onClick: () => setSelectedTaskImage(null), className: "absolute -top-1.5 -right-1.5 bg-rose-500 text-white w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shadow" }, "✕")
-              ),
+                <ul id="task-list" class="apple-list">
+                    <!-- Görevler JS ile buraya yüklenecek -->
+                </ul>
+            </section>
 
-              e("button", { onClick: () => addTask(), className: "w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-bold" }, "Kaydet")
-            ),
+            <!-- TAKVİM SEKMESİ -->
+            <section id="calendar" class="tab-content">
+                <header class="section-header">
+                    <h1>Takvim & Etkinlikler</h1>
+                </header>
+                <div class="card">
+                    <div class="calendar-header">
+                        <h3 id="calendar-month-year"></h3>
+                    </div>
+                    <div class="calendar-grid" id="calendar-grid">
+                        <!-- Takvim günleri JS ile oluşturulacak -->
+                    </div>
+                </div>
+            </section>
 
-            filteredTasks.map(task => e("div", { 
-              key: task.id, 
-              className: "p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col gap-2" 
-            },
-              e("div", { className: "flex items-center justify-between gap-2" },
-                e("div", { className: "flex items-center gap-2 flex-1" },
-                  e("button", {
-                    onClick: () => toggleTask(task.id),
-                    className: `w-4 h-4 rounded border flex items-center justify-center text-xs font-bold ${task.completed ? "bg-blue-600 text-white border-blue-600" : "border-slate-400"}`
-                  }, task.completed ? "✓" : ""),
-                  e("span", { className: `text-xs font-semibold ${task.completed ? "line-through text-slate-400" : ""}` }, task.title)
-                ),
-                e("button", { onClick: () => deleteTaskFromFirebase(task.id), className: "text-slate-400 text-xs px-1" }, "🗑️")
-              ),
-              
-              // Uygulama içi Resim Açıcı Tıklama Olayı
-              task.image && e("div", { 
-                onClick: () => setPreviewImageUrl(task.image), 
-                className: "cursor-pointer inline-block ml-6" 
-              },
-                e("img", { src: task.image, className: "w-20 h-16 object-cover rounded-lg border hover:opacity-80 transition-all" })
-              )
-            ))
-          ),
+            <!-- TOPLANTI NOTLARI SEKMESİ -->
+            <section id="notes" class="tab-content">
+                <header class="section-header">
+                    <h1>Toplantı Notları</h1>
+                </header>
+                
+                <div class="card add-card flex-col">
+                    <input type="text" id="note-title" placeholder="Toplantı Başlığı">
+                    <textarea id="note-body" placeholder="Notlarınızı buraya yazın..." rows="4"></textarea>
+                    
+                    <!-- Dosya / Fotoğraf Yükleme Alanı -->
+                    <div class="file-upload-wrapper">
+                        <label for="note-file" class="file-label">
+                            <i class="fa-solid fa-paperclip"></i> Fotoğraf veya Ek Ekle
+                        </label>
+                        <input type="file" id="note-file" accept="image/*,application/pdf" multiple onchange="handleFileSelect(event)">
+                        <span id="file-name-display">Dosya seçilmedi</span>
+                    </div>
 
-          /* ---------------- 2. TOPLANTI KONULARI ---------------- */
-          activeTab === "meetings" && e("div", { className: "space-y-3" },
+                    <button class="apple-btn align-self-end" onclick="addNote()">Notu Kaydet</button>
+                </div>
 
-            !selectedFolderId && e("div", { className: "space-y-3" },
-              e("div", { className: "p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex gap-2" },
-                e("input", {
-                  type: "text",
-                  placeholder: "Ana Toplantı Başlığı (Örn: Ass Takip...)",
-                  value: newMeetingTitle,
-                  onChange: (ev) => setNewMeetingTitle(ev.target.value),
-                  className: "flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs outline-none"
-                }),
-                e("button", { onClick: addMeetingFolder, className: "px-3 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold" }, "Oluştur")
-              ),
+                <div id="notes-list" class="notes-grid">
+                    <!-- Notlar JS ile buraya eklenecek -->
+                </div>
+            </section>
 
-              e("div", { className: "space-y-2" },
-                meetingTopics.map(folder => e("div", {
-                  key: folder.id,
-                  onClick: () => { setSelectedFolderId(folder.id); setSelectedSessionId(null); },
-                  className: "p-3.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between cursor-pointer hover:border-blue-500 transition-all"
-                },
-                  e("div", { className: "flex items-center gap-2.5" },
-                    e("span", { className: "text-lg" }, "📁"),
-                    e("div", null,
-                      e("h4", { className: "font-black text-xs text-slate-900 dark:text-white" }, folder.title),
-                      e("span", { className: "text-[10px] text-slate-400 font-bold" }, `${(folder.sessions || []).length} Oturum Klasörü`)
-                    )
-                  ),
-                  e("span", { className: "text-xs text-blue-600 font-bold" }, "Aç ➔")
-                ))
-              )
-            ),
+        </main>
+    </div>
 
-            selectedFolderId && !selectedSessionId && e("div", { className: "space-y-3" },
-              e("div", { className: "flex items-center justify-between" },
-                e("button", {
-                  onClick: () => setSelectedFolderId(null),
-                  className: "text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1"
-                }, "⬅️ Tüm Klasörlere Dön"),
-                e("span", { className: "text-xs font-black bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-300 px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800" }, activeFolderObj?.title)
-              ),
-
-              e("div", { className: "p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2" },
-                e("span", { className: "text-[11px] font-black text-slate-700 dark:text-slate-300 block" }, "➕ Yeni Tarihli Toplantı Klasörü Aç"),
-                e("div", { className: "flex gap-2" },
-                  e("input", {
-                    type: "date",
-                    value: newSessionDate,
-                    onChange: (ev) => setNewSessionDate(ev.target.value),
-                    className: "flex-1 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs font-bold"
-                  }),
-                  e("button", {
-                    onClick: () => addSessionToFolder(selectedFolderId),
-                    className: "px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold"
-                  }, "Ekle")
-                )
-              ),
-
-              e("div", { className: "space-y-2" },
-                (activeFolderObj?.sessions || []).map(session => e("div", {
-                  key: session.id,
-                  className: "p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between"
-                },
-                  e("div", {
-                    onClick: () => setSelectedSessionId(session.id),
-                    className: "cursor-pointer flex items-center gap-2.5 flex-1"
-                  },
-                    e("span", { className: "text-base" }, "📂"),
-                    e("div", null,
-                      e("h5", { className: "font-black text-xs text-slate-800 dark:text-slate-100" }, session.title),
-                      e("span", { className: "text-[10px] text-slate-400 font-semibold" }, `Tarih: ${session.date} • ${(session.notes || []).length} Not/Karar`)
-                    )
-                  ),
-                  e("div", { className: "flex items-center gap-1.5" },
-                    e("button", {
-                      onClick: () => exportSessionPDF(activeFolderObj.title, session),
-                      className: "px-2 py-1 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-lg text-[10px] font-bold"
-                    }, "📄 PDF"),
-                    e("button", {
-                      onClick: () => setSelectedSessionId(session.id),
-                      className: "px-2.5 py-1 bg-blue-600 text-white rounded-lg text-[10px] font-black"
-                    }, "Aç")
-                  )
-                ))
-              )
-            ),
-
-            selectedFolderId && selectedSessionId && e("div", { className: "space-y-3" },
-              e("div", { className: "flex items-center justify-between" },
-                e("button", {
-                  onClick: () => setSelectedSessionId(null),
-                  className: "text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1"
-                }, "⬅️ Oturumlara Dön"),
-                e("span", { className: "text-xs font-black bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800" }, `${activeSessionObj?.title} (${activeSessionObj?.date})`)
-              ),
-
-              e("div", { className: "p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2" },
-                e("textarea", {
-                  rows: "2",
-                  placeholder: "Toplantı notu veya alınan karar...",
-                  value: newNoteContent,
-                  onChange: (ev) => setNewNoteContent(ev.target.value),
-                  className: "w-full p-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs outline-none"
-                }),
-
-                e("div", { className: "flex gap-2" },
-                  e("input", {
-                    type: "text",
-                    placeholder: "Sorumlu (Örn: Mehmet)",
-                    value: newNoteAssignee,
-                    onChange: (ev) => setNewNoteAssignee(ev.target.value),
-                    className: "flex-1 p-1.5 bg-slate-50 dark:bg-slate-800 border rounded-lg text-xs outline-none"
-                  }),
-                  e("button", {
-                    onClick: toggleListeningNote,
-                    className: `px-2.5 py-1.5 rounded-lg border text-[10px] font-bold ${isListeningNote ? "bg-rose-500 text-white animate-pulse" : "bg-slate-100 dark:bg-slate-800"}`
-                  }, "🎙️ Ses"),
-                  e("button", {
-                    onClick: () => meetingFileInputRef.current && meetingFileInputRef.current.click(),
-                    className: "px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 border rounded-lg text-[10px] font-bold"
-                  }, "📷 Resim")
-                ),
-
-                selectedMeetingImage && e("div", { className: "relative w-12 h-12" },
-                  e("img", { src: selectedMeetingImage, className: "w-full h-full object-cover rounded-lg border" }),
-                  e("button", { onClick: () => setSelectedMeetingImage(null), className: "absolute -top-1 -right-1 bg-rose-500 text-white w-4 h-4 rounded-full text-[8px]" }, "✕")
-                ),
-
-                e("button", {
-                  onClick: () => addNoteToSession(selectedFolderId, selectedSessionId),
-                  className: "w-full py-2 bg-indigo-600 text-white rounded-xl text-xs font-extrabold shadow-xs"
-                }, "Kaydet")
-              ),
-
-              e("div", { className: "space-y-1.5" },
-                (activeSessionObj?.notes || []).map((note, idx) => e("div", {
-                  key: note.id,
-                  className: "p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1 shadow-2xs"
-                },
-                  e("div", { className: "flex items-center justify-between" },
-                    e("div", { className: "flex items-center gap-1.5" },
-                      e("span", { className: "text-[10px] font-black text-slate-400" }, `#${idx + 1}`),
-                      e("span", { className: "text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950 px-1.5 py-0.5 rounded" }, `👤 ${note.assignee}`)
-                    ),
-                    e("button", {
-                      onClick: () => {
-                        addTask(`[${activeFolderObj.title} - ${activeSessionObj.title}] ${note.content}`);
-                        alert("Görevlere aktarıldı!");
-                      },
-                      className: "text-[10px] font-bold text-blue-600 hover:underline"
-                    }, "➡️ Görev Yap")
-                  ),
-                  e("p", { className: "text-xs font-semibold text-slate-800 dark:text-slate-100 leading-snug" }, note.content),
-                  
-                  // Toplantı Notundaki Resim İçin Uygulama İçi Resim Açıcı
-                  note.image && e("div", { 
-                    onClick: () => setPreviewImageUrl(note.image), 
-                    className: "cursor-pointer inline-block mt-1" 
-                  },
-                    e("img", { src: note.image, className: "w-16 h-12 object-cover rounded-lg border hover:opacity-80 transition-all" })
-                  )
-                ))
-              )
-            )
-          )
-        )
-      );
-    }
-
-    ReactDOM.createRoot(document.getElementById("root")).render(e(App));
-  </script>
+    <script src="script.js"></script>
 </body>
 </html>
