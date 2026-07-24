@@ -7,7 +7,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script>
     tailwind.config = { darkMode: 'class' }
   </script>
@@ -15,7 +14,8 @@
 <body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans antialiased min-h-screen">
   <div id="root"></div>
 
-  <script type="text/babel">
+  <script>
+    const e = React.createElement;
     const { useState, useEffect, useRef } = React;
 
     function App() {
@@ -41,7 +41,6 @@
       const [editCategory, setEditCategory] = useState("Üretim");
 
       const [newTopicTitle, setNewTopicTitle] = useState("");
-      const [newTopicCategory, setNewTopicCategory] = useState("Üretim");
       const [selectedTopicId, setSelectedTopicId] = useState(null);
       const [newNoteContent, setNewNoteContent] = useState("");
 
@@ -53,45 +52,43 @@
         else document.documentElement.classList.remove('dark');
       }, [darkMode]);
 
-      // Güvenli Veri Yükleme (Veri çökmesine karşı korumalı)
       useEffect(() => {
         const today = new Date().toISOString().split("T")[0];
         try {
-          const savedTasks = localStorage.getItem("my_workspace_tasks_v7");
+          const savedTasks = localStorage.getItem("my_workspace_tasks_v8");
           if (savedTasks) {
             setTasks(JSON.parse(savedTasks));
           } else {
             setTasks([
-              { id: "1", title: "Dünkü kontrol ve aksiyon takibi", date: today, completed: false, priority: "Yüksek", category: "Üretim", image: null },
-              { id: "2", title: "Montaj ve kaynak süreleri raporu detaylı incelemesi", date: today, completed: false, priority: "Orta", category: "Kalite", image: null }
+              { id: "1", title: "Kontrol ve aksiyon takibi", date: today, completed: false, priority: "Yüksek", category: "Üretim", image: null }
             ]);
           }
 
-          const savedTopics = localStorage.getItem("my_workspace_topics_v7");
+          const savedTopics = localStorage.getItem("my_workspace_topics_v8");
           if (savedTopics) {
             setMeetingTopics(JSON.parse(savedTopics));
           } else {
             setMeetingTopics([]);
           }
-        } catch (e) {
-          console.error("Veri okuma hatası:", e);
+        } catch (err) {
+          console.error(err);
         }
       }, []);
 
       useEffect(() => {
         try {
-          if (tasks.length > 0) localStorage.setItem("my_workspace_tasks_v7", JSON.stringify(tasks));
+          if (tasks.length > 0) localStorage.setItem("my_workspace_tasks_v8", JSON.stringify(tasks));
         } catch (e) {}
       }, [tasks]);
 
       useEffect(() => {
         try {
-          if (meetingTopics.length > 0) localStorage.setItem("my_workspace_topics_v7", JSON.stringify(meetingTopics));
+          if (meetingTopics.length > 0) localStorage.setItem("my_workspace_topics_v8", JSON.stringify(meetingTopics));
         } catch (e) {}
       }, [meetingTopics]);
 
-      const handleImageSelect = (e) => {
-        const file = e.target.files && e.target.files[0];
+      const handleImageSelect = (evt) => {
+        const file = evt.target.files && evt.target.files[0];
         if (file) {
           const reader = new FileReader();
           reader.onloadend = () => setSelectedImage(reader.result);
@@ -110,8 +107,8 @@
         downloadAnchor.remove();
       };
 
-      const importData = (e) => {
-        const file = e.target.files && e.target.files[0];
+      const importData = (evt) => {
+        const file = evt.target.files && evt.target.files[0];
         if (!file) return;
         const fileReader = new FileReader();
         fileReader.readAsText(file, "UTF-8");
@@ -187,7 +184,7 @@
 
       const addMeetingTopic = () => {
         if (!newTopicTitle.trim()) return;
-        setMeetingTopics([{ id: "top_" + Date.now(), title: newTopicTitle, category: newTopicCategory, notes: [] }, ...meetingTopics]);
+        setMeetingTopics([{ id: "top_" + Date.now(), title: newTopicTitle, notes: [] }, ...meetingTopics]);
         setNewTopicTitle("");
       };
 
@@ -229,7 +226,7 @@
         return days;
       })();
 
-      const getPriorityBadge = (p) => {
+      const getPriorityBadgeClass = (p) => {
         switch (p) {
           case "Yüksek": return "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-800";
           case "Orta": return "bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200 dark:border-amber-800";
@@ -237,392 +234,263 @@
         }
       };
 
-      return (
-        <div className="max-w-md mx-auto min-h-screen flex flex-col pb-10">
+      return e("div", { className: "max-w-md mx-auto min-h-screen flex flex-col pb-10" },
+        e("input", { type: "file", accept: "image/*", ref: fileInputRef, onChange: handleImageSelect, className: "hidden" }),
+        e("input", { type: "file", accept: ".json", ref: importInputRef, onChange: importData, className: "hidden" }),
 
-          <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageSelect} className="hidden" />
-          <input type="file" accept=".json" ref={importInputRef} onChange={importData} className="hidden" />
+        // Header
+        e("header", { className: "p-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 sticky top-0 z-30" },
+          e("div", { className: "flex items-center gap-2" },
+            e("div", { className: "w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-sm" }, "⚡"),
+            e("div", null,
+              e("h1", { className: "font-bold text-sm text-slate-900 dark:text-white" }, "İş Asistanım"),
+              e("p", { className: "text-[10px] text-slate-400" }, "Kişisel Görev & Not Yönetimi")
+            )
+          ),
+          e("div", { className: "flex items-center gap-1.5" },
+            e("button", { onClick: exportData, title: "Yedek İndir", className: "p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs" }, "📤"),
+            e("button", { onClick: () => importInputRef.current && importInputRef.current.click(), title: "Yedek Yükle", className: "p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs" }, "📥"),
+            e("button", { onClick: () => setDarkMode(!darkMode), className: "p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs" }, darkMode ? "☀️" : "🌙")
+          )
+        ),
 
-          {/* HEADER */}
-          <header className="p-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md sticky top-0 z-30">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-sm shadow-sm">⚡</div>
-              <div>
-                <h1 className="font-bold text-sm text-slate-900 dark:text-white leading-tight">İş Asistanım</h1>
-                <p className="text-[10px] text-slate-400">Kişisel Görev & Not Yönetimi</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-1.5">
-              <button onClick={exportData} title="Yedek İndir" className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium">📤</button>
-              <button onClick={() => importInputRef.current && importInputRef.current.click()} title="Yedek Yükle" className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium">📥</button>
-              <button onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold">
-                {darkMode ? "☀️" : "🌙"}
-              </button>
-            </div>
-          </header>
+        e("main", { className: "p-4 space-y-4" },
+          // Search
+          e("div", { className: "relative" },
+            e("input", {
+              type: "text",
+              placeholder: "Görevlerde ara...",
+              value: searchQuery,
+              onChange: (ev) => setSearchQuery(ev.target.value),
+              className: "w-full pl-9 pr-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs"
+            }),
+            e("span", { className: "absolute left-3 top-3 text-slate-400 text-xs" }, "🔍")
+          ),
 
-          <main className="p-4 space-y-4">
+          // Tabs
+          e("div", { className: "flex bg-slate-200/60 dark:bg-slate-800/80 p-1 rounded-2xl gap-1" },
+            e("button", {
+              onClick: () => setActiveTab("daily"),
+              className: `flex-1 py-2 text-xs font-bold rounded-xl ${activeTab === "daily" ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm" : "text-slate-500"}`
+            }, "☑️ Günlük Görevler"),
+            e("button", {
+              onClick: () => setActiveTab("meetings"),
+              className: `flex-1 py-2 text-xs font-bold rounded-xl ${activeTab === "meetings" ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm" : "text-slate-500"}`
+            }, "📁 Toplantı Konuları")
+          ),
 
-            {/* ARAMA BAR-I */}
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Görev veya konularda ara..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-2xl text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40 shadow-xs"
-              />
-              <span className="absolute left-3 top-3 text-slate-400 text-xs">🔍</span>
-            </div>
+          // Calendar Strip
+          e("section", { className: "bg-white dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs" },
+            e("div", { className: "flex items-center justify-between mb-2 px-1" },
+              e("span", { className: "text-xs font-bold text-slate-700 dark:text-slate-200" }, `📅 ${selectedDate}`),
+              e("input", {
+                type: "date",
+                value: selectedDate,
+                onChange: (ev) => setSelectedDate(ev.target.value),
+                className: "text-xs bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-600"
+              })
+            ),
+            e("div", { className: "flex gap-2 overflow-x-auto pb-1" },
+              calendarDays.map((d) => {
+                const isSelected = d.iso === selectedDate;
+                return e("button", {
+                  key: d.iso,
+                  onClick: () => setSelectedDate(d.iso),
+                  className: `flex-shrink-0 w-11 py-2 rounded-xl flex flex-col items-center justify-center ${isSelected ? "bg-blue-600 text-white" : "bg-slate-50 dark:bg-slate-700/40 text-slate-600 dark:text-slate-300"}`
+                },
+                  e("span", { className: "text-[10px]" }, d.dayName),
+                  e("span", { className: "text-xs font-bold mt-0.5" }, d.dayNum)
+                );
+              })
+            )
+          ),
 
-            {/* SEKMELER */}
-            <div className="flex bg-slate-200/60 dark:bg-slate-800/80 p-1 rounded-2xl gap-1">
-              <button
-                onClick={() => setActiveTab("daily")}
-                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
-                  activeTab === "daily" 
-                    ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm" 
-                    : "text-slate-500 dark:text-slate-400"
-                }`}
-              >
-                ☑️ Günlük Görevler
-              </button>
-              <button
-                onClick={() => setActiveTab("meetings")}
-                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
-                  activeTab === "meetings" 
-                    ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm" 
-                    : "text-slate-500 dark:text-slate-400"
-                }`}
-              >
-                📁 Toplantı Konuları
-              </button>
-            </div>
+          // Progress
+          e("div", { className: "bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-3.5 text-white flex items-center justify-between" },
+            e("div", null,
+              e("p", { className: "text-[10px] text-blue-100 font-semibold uppercase" }, "Günlük İlerleme"),
+              e("h3", { className: "text-sm font-bold mt-0.5" }, `${completedCount} / ${dayTasks.length} Tamamlandı`)
+            ),
+            e("div", { className: "text-sm font-extrabold bg-white/20 px-2.5 py-1 rounded-xl" }, `%${progressPercent}`)
+          ),
 
-            {/* TAKVİM ŞERİDİ */}
-            <section className="bg-white dark:bg-slate-800 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 shadow-xs">
-              <div className="flex items-center justify-between mb-2 px-1">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                  📅 {selectedDate === new Date().toISOString().split("T")[0] ? "Bugün" : selectedDate}
-                </span>
-                <input 
-                  type="date" 
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-2 py-1 rounded-lg focus:outline-none border border-slate-200 dark:border-slate-600"
-                />
-              </div>
+          // Action Buttons
+          e("div", { className: "grid grid-cols-3 gap-2" },
+            e("button", {
+              onClick: () => setShowAddForm(!showAddForm),
+              className: "p-2.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-2xl flex items-center justify-center gap-1.5 text-blue-600 dark:text-blue-400 font-bold text-xs"
+            }, showAddForm ? "✖️ Kapat" : "➕ Yeni Görev"),
 
-              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-                {calendarDays.map((d) => {
-                  const isSelected = d.iso === selectedDate;
-                  const isToday = d.iso === new Date().toISOString().split("T")[0];
-                  const hasTasks = tasks.some(t => t.date === d.iso && !t.completed);
+            e("button", {
+              onClick: toggleListening,
+              className: `p-2.5 border rounded-2xl flex items-center justify-center gap-1.5 font-bold text-xs ${isListening ? "bg-red-500 text-white" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"}`
+            }, isListening ? "🎙️ Dinliyor..." : "🎙️ Sesle Ekle"),
 
-                  return (
-                    <button
-                      key={d.iso}
-                      onClick={() => setSelectedDate(d.iso)}
-                      className={`flex-shrink-0 w-11 py-2 rounded-xl flex flex-col items-center justify-center transition-all ${
-                        isSelected 
-                          ? "bg-blue-600 text-white shadow-md shadow-blue-500/20" 
-                          : isToday 
-                          ? "bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800"
-                          : "bg-slate-50 dark:bg-slate-700/40 text-slate-600 dark:text-slate-300"
-                      }`}
-                    >
-                      <span className="text-[10px] font-medium opacity-80">{d.dayName}</span>
-                      <span className="text-xs font-bold mt-0.5">{d.dayNum}</span>
-                      {hasTasks && <span className={`w-1.5 h-1.5 rounded-full mt-1 ${isSelected ? "bg-white" : "bg-blue-500"}`}></span>}
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
+            e("button", {
+              onClick: () => fileInputRef.current && fileInputRef.current.click(),
+              className: "p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl flex items-center justify-center gap-1.5 text-slate-700 dark:text-slate-200 font-bold text-xs"
+            }, "📷 Resim Ekle")
+          ),
 
-            {/* İLERLEME KARTI */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-3.5 text-white shadow-sm flex items-center justify-between">
-              <div>
-                <p className="text-[10px] text-blue-100 font-semibold tracking-wide uppercase">Günlük İlerleme</p>
-                <h3 className="text-sm font-bold mt-0.5">{completedCount} / {dayTasks.length} Görev Tamamlandı</h3>
-              </div>
-              <div className="text-sm font-extrabold bg-white/20 px-2.5 py-1 rounded-xl">
-                %{progressPercent}
-              </div>
-            </div>
+          selectedImage && e("div", { className: "bg-white dark:bg-slate-800 p-2.5 rounded-2xl border border-blue-200 flex items-center justify-between" },
+            e("div", { className: "flex items-center gap-2" },
+              e("img", { src: selectedImage, className: "w-10 h-10 object-cover rounded-lg" }),
+              e("span", { className: "text-xs text-slate-600 dark:text-slate-300 font-medium" }, "Resim Eklendi")
+            ),
+            e("button", { onClick: () => setSelectedImage(null), className: "text-red-500 text-xs font-bold" }, "Kaldır")
+          ),
 
-            {/* HIZLI EYLEM BUTONLARI */}
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                onClick={() => setShowAddForm(!showAddForm)}
-                className="p-2.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 rounded-2xl flex items-center justify-center gap-1.5 text-blue-600 dark:text-blue-400 font-bold text-xs shadow-xs"
-              >
-                <span>{showAddForm ? "✖️" : "➕"}</span>
-                <span>{showAddForm ? "Kapat" : "Yeni Görev"}</span>
-              </button>
+          // Form
+          showAddForm && e("section", { className: "bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3" },
+            e("h3", { className: "text-xs font-bold text-slate-800 dark:text-slate-100" }, `✍️ ${selectedDate} İçin Yeni Görev`),
+            e("textarea", {
+              rows: "2",
+              placeholder: "Görev detayını yazın...",
+              value: newTaskTitle,
+              onChange: (ev) => setNewTaskTitle(ev.target.value),
+              className: "w-full p-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-xs"
+            }),
+            e("div", { className: "flex gap-2" },
+              e("select", {
+                value: newTaskPriority,
+                onChange: (ev) => setNewTaskPriority(ev.target.value),
+                className: "flex-1 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-[11px] p-2 text-slate-700 dark:text-slate-200"
+              },
+                e("option", { value: "Düşük" }, "🟢 Düşük Öncelik"),
+                e("option", { value: "Orta" }, "🟡 Orta Öncelik"),
+                e("option", { value: "Yüksek" }, "🔴 Yüksek Öncelik")
+              ),
+              e("select", {
+                value: newTaskCategory,
+                onChange: (ev) => setNewTaskCategory(ev.target.value),
+                className: "flex-1 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-[11px] p-2 text-slate-700 dark:text-slate-200"
+              },
+                e("option", { value: "Üretim" }, "⚙️ Üretim"),
+                e("option", { value: "Kalite" }, "🔍 Kalite"),
+                e("option", { value: "Toplantı" }, "🤝 Toplantı"),
+                e("option", { value: "Kişisel" }, "👤 Kişisel")
+              )
+            ),
+            e("button", { onClick: () => addTask(), className: "w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-bold" }, "Kaydet ve Ekle")
+          ),
 
-              <button
-                onClick={toggleListening}
-                className={`p-2.5 border rounded-2xl flex items-center justify-center gap-1.5 font-bold text-xs shadow-xs transition ${
-                  isListening ? "bg-red-500 text-white border-red-600 animate-pulse" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700/80 text-slate-700 dark:text-slate-200"
-                }`}
-              >
-                <span>🎙️</span>
-                <span>{isListening ? "Dinliyor..." : "Sesle Ekle"}</span>
-              </button>
+          // Daily Tab
+          activeTab === "daily" && e("div", { className: "space-y-2.5" },
+            dayTasks.length === 0 
+              ? e("div", { className: "p-8 text-center bg-white dark:bg-slate-800/60 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 text-slate-400 text-xs" }, "Görev bulunmuyor.")
+              : dayTasks.map(task => {
+                const isEditing = editingTaskId === task.id;
+                return e("div", { key: task.id, className: "p-3.5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700" },
+                  isEditing 
+                    ? e("div", { className: "space-y-2" },
+                      e("textarea", {
+                        value: editTitle,
+                        onChange: (ev) => setEditTitle(ev.target.value),
+                        className: "w-full p-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs",
+                        rows: "2"
+                      }),
+                      e("div", { className: "flex justify-end gap-2" },
+                        e("button", { onClick: () => setEditingTaskId(null), className: "px-3 py-1 bg-slate-200 dark:bg-slate-700 text-[11px] rounded-lg" }, "İptal"),
+                        e("button", { onClick: () => saveEditing(task.id), className: "px-3 py-1 bg-blue-600 text-white text-[11px] rounded-lg" }, "Kaydet")
+                      )
+                    )
+                    : e("div", { className: "space-y-2" },
+                      e("div", { className: "flex items-start justify-between gap-3" },
+                        e("div", { className: "flex items-start gap-2.5 flex-1" },
+                          e("input", {
+                            type: "checkbox",
+                            checked: !!task.completed,
+                            onChange: () => toggleTask(task.id),
+                            className: "w-4 h-4 mt-0.5 rounded border-slate-300 text-blue-600 cursor-pointer accent-blue-600"
+                          }),
+                          e("p", { className: `text-xs leading-relaxed font-medium ${task.completed ? "line-through text-slate-400" : "text-slate-800 dark:text-slate-100"}` }, task.title)
+                        ),
+                        e("div", { className: "flex items-center gap-1" },
+                          e("button", { onClick: () => startEditing(task), className: "text-slate-400 text-xs p-1" }, "✏️"),
+                          e("button", { onClick: () => deleteTask(task.id), className: "text-slate-400 text-xs p-1" }, "🗑️")
+                        )
+                      ),
+                      task.image && e("img", { src: task.image, className: "max-h-48 w-full object-cover rounded-xl border border-slate-100 dark:border-slate-700" }),
+                      e("div", { className: "flex items-center gap-1.5 pt-1" },
+                        e("span", { className: `text-[9px] px-2 py-0.5 rounded-md font-semibold ${getPriorityBadgeClass(task.priority)}` }, task.priority || "Orta"),
+                        e("span", { className: "text-[9px] px-2 py-0.5 rounded-md font-semibold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300" }, task.category || "Üretim")
+                      )
+                    )
+                );
+              })
+          ),
 
-              <button
-                onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                className="p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-2xl flex items-center justify-center gap-1.5 text-slate-700 dark:text-slate-200 font-bold text-xs shadow-xs"
-              >
-                <span>📷</span>
-                <span>Resim Ekle</span>
-              </button>
-            </div>
+          // Meetings Tab
+          activeTab === "meetings" && e("div", { className: "space-y-3" },
+            e("section", { className: "bg-white dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2" },
+              e("h3", { className: "text-xs font-bold text-slate-800 dark:text-slate-100" }, "📁 Yeni Toplantı / Proje Başlığı"),
+              e("div", { className: "flex gap-2" },
+                e("input", {
+                  type: "text",
+                  placeholder: "Örn: Kalite Analizleri...",
+                  value: newTopicTitle,
+                  onChange: (ev) => setNewTopicTitle(ev.target.value),
+                  className: "flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-xs"
+                }),
+                e("button", { onClick: addMeetingTopic, className: "px-3 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold" }, "Aç")
+              )
+            ),
+            e("div", { className: "space-y-2.5" },
+              meetingTopics.map((topic) => {
+                const isExpanded = selectedTopicId === topic.id;
+                const notesList = topic.notes || [];
 
-            {/* SEÇİLEN RESİM ÖNİZLEME */}
-            {selectedImage && (
-              <div className="bg-white dark:bg-slate-800 p-2.5 rounded-2xl border border-blue-200 dark:border-blue-800 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <img src={selectedImage} alt="Seçilen" className="w-10 h-10 object-cover rounded-lg" />
-                  <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">Resim Eklendi</span>
-                </div>
-                <button onClick={() => setSelectedImage(null)} className="text-red-500 text-xs font-bold px-2 py-1">Kaldır</button>
-              </div>
-            )}
-
-            {/* GÖREV EKLEME FORMU */}
-            {showAddForm && (
-              <section className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
-                <h3 className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                  ✍️ {selectedDate} İçin Yeni Görev
-                </h3>
-                <textarea
-                  rows="2"
-                  placeholder="Görev detayını yazın..."
-                  value={newTaskTitle}
-                  onChange={(e) => setNewTaskTitle(e.target.value)}
-                  className="w-full p-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-xs focus:outline-none"
-                ></textarea>
-                
-                <div className="flex gap-2">
-                  <select
-                    value={newTaskPriority}
-                    onChange={(e) => setNewTaskPriority(e.target.value)}
-                    className="flex-1 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-[11px] p-2 text-slate-700 dark:text-slate-200"
-                  >
-                    <option value="Düşük">🟢 Düşük Öncelik</option>
-                    <option value="Orta">🟡 Orta Öncelik</option>
-                    <option value="Yüksek">🔴 Yüksek Öncelik</option>
-                  </select>
-
-                  <select
-                    value={newTaskCategory}
-                    onChange={(e) => setNewTaskCategory(e.target.value)}
-                    className="flex-1 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-[11px] p-2 text-slate-700 dark:text-slate-200"
-                  >
-                    <option value="Üretim">⚙️ Üretim</option>
-                    <option value="Kalite">🔍 Kalite</option>
-                    <option value="Toplantı">🤝 Toplantı</option>
-                    <option value="Kişisel">👤 Kişisel</option>
-                  </select>
-                </div>
-
-                <button
-                  onClick={() => addTask()}
-                  className="w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-bold shadow-sm"
-                >
-                  Kaydet ve Ekle
-                </button>
-              </section>
-            )}
-
-            {/* TAB 1: GÜNLÜK GÖREV LİSTESİ */}
-            {activeTab === "daily" && (
-              <div className="space-y-2.5">
-                {dayTasks.length === 0 ? (
-                  <div className="p-8 text-center bg-white dark:bg-slate-800/60 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700/80 text-slate-400 text-xs">
-                    Bu tarih için kayıtlı bir görev bulunmuyor.
-                  </div>
-                ) : (
-                  dayTasks.map((task) => {
-                    const isEditing = editingTaskId === task.id;
-
-                    return (
-                      <div
-                        key={task.id}
-                        className="p-3.5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/70 shadow-2xs"
-                      >
-                        {isEditing ? (
-                          <div className="space-y-2.5">
-                            <textarea
-                              value={editTitle}
-                              onChange={(e) => setEditTitle(e.target.value)}
-                              className="w-full p-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs"
-                              rows="2"
-                            />
-                            <div className="flex gap-2">
-                              <select
-                                value={editPriority}
-                                onChange={(e) => setEditPriority(e.target.value)}
-                                className="flex-1 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-[10px] p-1.5"
-                              >
-                                <option value="Düşük">🟢 Düşük</option>
-                                <option value="Orta">🟡 Orta</option>
-                                <option value="Yüksek">🔴 Yüksek</option>
-                              </select>
-                              <select
-                                value={editCategory}
-                                onChange={(e) => setEditCategory(e.target.value)}
-                                className="flex-1 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-[10px] p-1.5"
-                              >
-                                <option value="Üretim">⚙️ Üretim</option>
-                                <option value="Kalite">🔍 Kalite</option>
-                                <option value="Toplantı">🤝 Toplantı</option>
-                                <option value="Kişisel">👤 Kişisel</option>
-                              </select>
-                            </div>
-                            <div className="flex justify-end gap-2">
-                              <button onClick={() => setEditingTaskId(null)} className="px-3 py-1 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-[11px] font-semibold rounded-lg">İptal</button>
-                              <button onClick={() => saveEditing(task.id)} className="px-3 py-1 bg-blue-600 text-white text-[11px] font-semibold rounded-lg">Kaydet</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex items-start gap-2.5 flex-1">
-                                <input
-                                  type="checkbox"
-                                  checked={!!task.completed}
-                                  onChange={() => toggleTask(task.id)}
-                                  className="w-4 h-4 mt-0.5 rounded border-slate-300 text-blue-600 cursor-pointer accent-blue-600 flex-shrink-0"
-                                />
-                                <p className={`text-xs leading-relaxed font-medium break-words ${task.completed ? "line-through text-slate-400 dark:text-slate-500" : "text-slate-800 dark:text-slate-100"}`}>
-                                  {task.title || "İsimsiz Görev"}
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-1 flex-shrink-0">
-                                <button onClick={() => startEditing(task)} title="Düzenle" className="text-slate-400 hover:text-blue-600 text-xs p-1">✏️</button>
-                                <button onClick={() => deleteTask(task.id)} title="Sil" className="text-slate-400 hover:text-red-500 text-xs p-1">🗑️</button>
-                              </div>
-                            </div>
-
-                            {task.image && (
-                              <div className="pt-1">
-                                <img src={task.image} alt="Görsel" className="max-h-48 w-full object-cover rounded-xl border border-slate-100 dark:border-slate-700" />
-                              </div>
-                            )}
-
-                            <div className="flex items-center gap-1.5 pt-1">
-                              <span className={`text-[9px] px-2 py-0.5 rounded-md font-semibold ${getPriorityBadge(task.priority)}`}>
-                                {task.priority || "Orta"}
-                              </span>
-                              <span className="text-[9px] px-2 py-0.5 rounded-md font-semibold bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300">
-                                {task.category || "Üretim"}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-            )}
-
-            {/* TAB 2: TOPLANTI KONULARI */}
-            {activeTab === "meetings" && (
-              <div className="space-y-3">
-                <section className="bg-white dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-2">
-                  <h3 className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                    📁 Yeni Toplantı / Proje Başlığı
-                  </h3>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Örn: Kalite Analizleri..."
-                      value={newTopicTitle}
-                      onChange={(e) => setNewTopicTitle(e.target.value)}
-                      className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-xs focus:outline-none"
-                    />
-                    <button onClick={addMeetingTopic} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold">Aç</button>
-                  </div>
-                </section>
-
-                <div className="space-y-2.5">
-                  {meetingTopics.map((topic) => {
-                    const isExpanded = selectedTopicId === topic.id;
-                    const notesList = topic.notes || [];
-
-                    return (
-                      <div key={topic.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-2xs overflow-hidden">
-                        <div 
-                          onClick={() => setSelectedTopicId(isExpanded ? null : topic.id)}
-                          className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/30 transition"
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <span className="text-base">📁</span>
-                            <div>
-                              <h4 className="font-bold text-xs text-slate-800 dark:text-slate-100">{topic.title}</h4>
-                              <p className="text-[10px] text-slate-400 mt-0.5">{notesList.length} Kayıtlı Not</p>
-                            </div>
-                          </div>
-                          <span className="text-slate-400 text-xs">{isExpanded ? "▲" : "▼"}</span>
-                        </div>
-
-                        {isExpanded && (
-                          <div className="p-3.5 pt-0 border-t border-slate-100 dark:border-slate-700/50 space-y-3 bg-slate-50/50 dark:bg-slate-800/40">
-                            <div className="mt-3 space-y-2">
-                              <label className="text-[10px] font-bold text-blue-600 dark:text-blue-400 block">
-                                ➕ ({selectedDate}) Tarihli Not Ekle:
-                              </label>
-                              <textarea
-                                rows="2"
-                                placeholder="Alınan karar veya not..."
-                                value={newNoteContent}
-                                onChange={(e) => setNewNoteContent(e.target.value)}
-                                className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs focus:outline-none"
-                              ></textarea>
-                              <button onClick={() => addNoteToTopic(topic.id)} className="w-full py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold">
-                                Notu Kaydet
-                              </button>
-                            </div>
-
-                            <div className="space-y-2 pt-1">
-                              {notesList.map((note) => (
-                                <div key={note.id} className="p-2.5 bg-white dark:bg-slate-700 rounded-xl border border-slate-200/60 dark:border-slate-600 shadow-2xs space-y-1">
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-[9px] font-bold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-950 px-1.5 py-0.5 rounded">📅 {note.date}</span>
-                                    <button 
-                                      onClick={() => {
-                                        addTask(`[${topic.title}] ${note.content}`);
-                                        alert("Not günün görevlerine eklendi!");
-                                      }}
-                                      className="text-[10px] text-indigo-600 dark:text-indigo-300 font-semibold"
-                                    >
-                                      ➡️ Göreve Aktar
-                                    </button>
-                                  </div>
-                                  <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed">{note.content}</p>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-          </main>
-        </div>
+                return e("div", { key: topic.id, className: "bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden" },
+                  e("div", {
+                    onClick: () => setSelectedTopicId(isExpanded ? null : topic.id),
+                    className: "p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/30"
+                  },
+                    e("div", { className: "flex items-center gap-2.5" },
+                      e("span", { className: "text-base" }, "📁"),
+                      e("div", null,
+                        e("h4", { className: "font-bold text-xs text-slate-800 dark:text-slate-100" }, topic.title),
+                        e("p", { className: "text-[10px] text-slate-400 mt-0.5" }, `${notesList.length} Not`)
+                      )
+                    ),
+                    e("span", { className: "text-slate-400 text-xs" }, isExpanded ? "▲" : "▼")
+                  ),
+                  isExpanded && e("div", { className: "p-3.5 pt-0 border-t border-slate-100 dark:border-slate-700/50 space-y-3 bg-slate-50/50 dark:bg-slate-800/40" },
+                    e("div", { className: "mt-3 space-y-2" },
+                      e("label", { className: "text-[10px] font-bold text-blue-600 dark:text-blue-400 block" }, `➕ (${selectedDate}) Tarihli Not Ekle:`),
+                      e("textarea", {
+                        rows: "2",
+                        placeholder: "Not yazın...",
+                        value: newNoteContent,
+                        onChange: (ev) => setNewNoteContent(ev.target.value),
+                        className: "w-full p-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs"
+                      }),
+                      e("button", { onClick: () => addNoteToTopic(topic.id), className: "w-full py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold" }, "Notu Kaydet")
+                    ),
+                    e("div", { className: "space-y-2 pt-1" },
+                      notesList.map((note) => e("div", { key: note.id, className: "p-2.5 bg-white dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 space-y-1" },
+                        e("div", { className: "flex justify-between items-center" },
+                          e("span", { className: "text-[9px] font-bold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-950 px-1.5 py-0.5 rounded" }, `📅 ${note.date}`),
+                          e("button", {
+                            onClick: () => {
+                              addTask(`[${topic.title}] ${note.content}`);
+                              alert("Not görevlere aktarıldı!");
+                            },
+                            className: "text-[10px] text-indigo-600 dark:text-indigo-300 font-semibold"
+                          }, "➡️ Göreve Aktar")
+                        ),
+                        e("p", { className: "text-xs text-slate-700 dark:text-slate-200 leading-relaxed" }, note.content)
+                      ))
+                    )
+                  )
+                );
+              })
+            )
+          )
+        )
       );
     }
 
-    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    ReactDOM.createRoot(document.getElementById("root")).render(e(App));
   </script>
 </body>
 </html>
