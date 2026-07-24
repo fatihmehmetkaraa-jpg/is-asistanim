@@ -85,6 +85,23 @@
       const [isListeningNote, setIsListeningNote] = useState(false);
       const [isSyncing, setIsSyncing] = useState(true);
 
+      // Tarih Şeridi Oluşturucu (Son 3 gün, Bugün, Gelecek 7 gün)
+      const generateDateList = () => {
+        const dates = [];
+        const base = new Date();
+        for (let i = -3; i <= 7; i++) {
+          const d = new Date(base);
+          d.setDate(base.getDate() + i);
+          const iso = d.toISOString().split("T")[0];
+          const dayName = d.toLocaleDateString("tr-TR", { weekday: "short" });
+          const dayNum = d.getDate();
+          dates.push({ iso, dayName, dayNum });
+        }
+        return dates;
+      };
+
+      const dateList = generateDateList();
+
       useEffect(() => {
         if (darkMode) document.documentElement.classList.add('dark');
         else document.documentElement.classList.remove('dark');
@@ -203,7 +220,6 @@
         if (existing) saveTaskToFirebase({ ...existing, completed: !existing.completed });
       };
 
-      // Ana Toplantı Başlığı / Klasörü Ekle
       const addMeetingFolder = () => {
         if (!newMeetingTitle.trim()) return;
         const newFolder = {
@@ -215,7 +231,6 @@
         setNewMeetingTitle("");
       };
 
-      // Klasör İçi Oturum Klasörü (Tarih ve Sıralı) Ekle
       const addSessionToFolder = (folderId) => {
         const folder = meetingTopics.find(f => f.id === folderId);
         if (!folder) return;
@@ -238,7 +253,6 @@
         saveTopicToFirebase(updatedFolder);
       };
 
-      // Oturuma Not Kaydet
       const addNoteToSession = (folderId, sessionId) => {
         if (!newNoteContent.trim() && !selectedMeetingImage) return;
         const folder = meetingTopics.find(f => f.id === folderId);
@@ -266,7 +280,6 @@
         setSelectedMeetingImage(null);
       };
 
-      // PDF Tutanak Alımı (Sadece Seçilen Oturum İçin)
       const exportSessionPDF = (folderTitle, session) => {
         const element = document.createElement("div");
         element.style.padding = "20px";
@@ -318,7 +331,6 @@
       const activeSessionObj = activeFolderObj?.sessions?.find(s => s.id === selectedSessionId);
 
       const filteredTasks = tasks.filter(t => t.date === selectedDate);
-      const completedCount = filteredTasks.filter(t => t.completed).length;
 
       return e("div", { className: "max-w-md mx-auto min-h-screen flex flex-col pb-12" },
         e("input", { type: "file", accept: "image/*", ref: taskFileInputRef, onChange: (ev) => {
@@ -339,7 +351,7 @@
           }
         }, className: "hidden" }),
 
-        // Top Header
+        // Header
         e("header", { className: "p-3.5 flex items-center justify-between backdrop-blur-xl bg-white/90 dark:bg-slate-900/90 sticky top-0 z-30 border-b border-slate-200 dark:border-slate-800 shadow-xs" },
           e("div", { className: "flex items-center gap-2" },
             e("div", { className: "w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-sm" }, "⚡"),
@@ -367,9 +379,36 @@
 
           /* ---------------- 1. GÜNLÜK GÖREVLER ---------------- */
           activeTab === "daily" && e("div", { className: "space-y-3" },
-            e("div", { className: "flex items-center justify-between px-1" },
-              e("span", { className: "text-xs font-black text-blue-600 dark:text-blue-400" }, `📅 ${selectedDate}`),
-              e("input", { type: "date", value: selectedDate, onChange: (ev) => setSelectedDate(ev.target.value), className: "text-xs bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700" })
+            
+            /* KURUMSAL MAVİ TEMA YATAY TARİH ŞERİDİ */
+            e("div", { className: "bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-3 rounded-2xl shadow-md space-y-2" },
+              e("div", { className: "flex items-center justify-between text-xs font-black" },
+                e("span", { className: "opacity-90" }, "📅 Tarih Seçimi"),
+                e("input", {
+                  type: "date",
+                  value: selectedDate,
+                  onChange: (ev) => setSelectedDate(ev.target.value),
+                  className: "bg-white/20 text-white placeholder-white text-[10px] px-2 py-0.5 rounded-lg border border-white/30 outline-none"
+                })
+              ),
+              e("div", { className: "flex gap-1.5 overflow-x-auto pb-1 scrollbar-none" },
+                dateList.map(item => {
+                  const isSelected = item.iso === selectedDate;
+                  const isToday = item.iso === todayISO;
+                  return e("button", {
+                    key: item.iso,
+                    onClick: () => setSelectedDate(item.iso),
+                    className: `flex-1 min-w-[50px] py-2 px-1 rounded-xl flex flex-col items-center justify-center transition-all ${
+                      isSelected 
+                        ? "bg-white text-blue-800 font-black shadow-lg scale-105" 
+                        : "bg-white/10 hover:bg-white/20 text-white font-medium"
+                    }`
+                  },
+                    e("span", { className: "text-[9px] uppercase tracking-wider opacity-80" }, isToday ? "Bugün" : item.dayName),
+                    e("span", { className: "text-sm font-black" }, item.dayNum)
+                  );
+                })
+              )
             ),
 
             e("div", { className: "grid grid-cols-3 gap-1.5" },
@@ -398,10 +437,9 @@
             ))
           ),
 
-          /* ---------------- 2. TOPLANTI MİMARİSİ (3 AŞAMALI HİYERARŞİ) ---------------- */
+          /* ---------------- 2. TOPLANTI MİMARİSİ (Aynen Korundu) ---------------- */
           activeTab === "meetings" && e("div", { className: "space-y-3" },
 
-            /* SEVİYE 1: HİÇBİR KLASÖR SEÇİLİ DEĞİL -> ANA BAŞLIK LİSTESİ */
             !selectedFolderId && e("div", { className: "space-y-3" },
               e("div", { className: "p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex gap-2" },
                 e("input", {
@@ -432,7 +470,6 @@
               )
             ),
 
-            /* SEVİYE 2: ANA KLASÖR SEÇİLİ -> TARİH VE TOPLANTI SIRA KLASÖRLERİ LİSTESİ */
             selectedFolderId && !selectedSessionId && e("div", { className: "space-y-3" },
               e("div", { className: "flex items-center justify-between" },
                 e("button", {
@@ -442,7 +479,6 @@
                 e("span", { className: "text-xs font-black bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-300 px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800" }, activeFolderObj?.title)
               ),
 
-              // Yeni Oturum (Tarihli Toplantı) Ekleme
               e("div", { className: "p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2" },
                 e("span", { className: "text-[11px] font-black text-slate-700 dark:text-slate-300 block" }, "➕ Yeni Tarihli Toplantı Klasörü Aç"),
                 e("div", { className: "flex gap-2" },
@@ -459,7 +495,6 @@
                 )
               ),
 
-              // Tarih ve Sıra Klasörleri Listesi
               e("div", { className: "space-y-2" },
                 (activeFolderObj?.sessions || []).map(session => e("div", {
                   key: session.id,
@@ -489,7 +524,6 @@
               )
             ),
 
-            /* SEVİYE 3: SEÇİLEN OTURUM KLASÖRÜ İÇİ -> KOMPAKT NOT VE KARAR LİSTESİ */
             selectedFolderId && selectedSessionId && e("div", { className: "space-y-3" },
               e("div", { className: "flex items-center justify-between" },
                 e("button", {
@@ -499,7 +533,6 @@
                 e("span", { className: "text-xs font-black bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800" }, `${activeSessionObj?.title} (${activeSessionObj?.date})`)
               ),
 
-              // Not Ekleme Formu
               e("div", { className: "p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2" },
                 e("textarea", {
                   rows: "2",
@@ -538,7 +571,6 @@
                 }, "Kaydet")
               ),
 
-              // ULTRA KOMPAKT NOT LİSTESİ
               e("div", { className: "space-y-1.5" },
                 (activeSessionObj?.notes || []).map((note, idx) => e("div", {
                   key: note.id,
@@ -559,7 +591,6 @@
                   ),
                   e("p", { className: "text-xs font-semibold text-slate-800 dark:text-slate-100 leading-snug" }, note.content),
                   
-                  // Kompakt Küçük Resim Önizlemesi
                   note.image && e("a", { href: note.image, target: "_blank", className: "inline-block mt-1" },
                     e("img", { src: note.image, className: "w-16 h-12 object-cover rounded-lg border" })
                   )
