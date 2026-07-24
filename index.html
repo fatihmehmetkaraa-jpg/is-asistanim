@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>İş Asistanım</title>
+  <title>İş Asistanım Pro</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -11,6 +11,7 @@
     tailwind.config = { darkMode: 'class' }
   </script>
 
+  <!-- Firebase SDK (v9 Modüler CDN) -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { 
@@ -35,12 +36,11 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // Global erişim için window nesnesine ekliyoruz
     window.db = db;
     window.dbFuncs = { collection, onSnapshot, doc, setDoc, deleteDoc };
   </script>
 </head>
-<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans antialiased min-h-screen">
+<body class="bg-gradient-to-br from-slate-100 via-slate-50 to-blue-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-slate-800 dark:text-slate-100 font-sans antialiased min-h-screen">
   <div id="root"></div>
 
   <script>
@@ -50,10 +50,10 @@
     function App() {
       const [darkMode, setDarkMode] = useState(false);
       const [activeTab, setActiveTab] = useState("daily");
+      const [viewMode, setViewMode] = useState("list"); // 'list' veya 'kanban'
       const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
 
       const fileInputRef = useRef(null);
-      const importInputRef = useRef(null);
       const [selectedImage, setSelectedImage] = useState(null);
 
       const [tasks, setTasks] = useState([]);
@@ -82,21 +82,18 @@
         else document.documentElement.classList.remove('dark');
       }, [darkMode]);
 
-      // Firebase Anlık Senkronizasyon Bağlantısı
       useEffect(() => {
         const checkDb = setInterval(() => {
           if (window.db && window.dbFuncs) {
             clearInterval(checkDb);
             const { collection, onSnapshot } = window.dbFuncs;
 
-            // Görevleri Anlık Dinle
             const unsubTasks = onSnapshot(collection(window.db, "tasks"), (snapshot) => {
               const loadedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
               setTasks(loadedTasks);
               setIsSyncing(false);
             });
 
-            // Toplantı Konularını Anlık Dinle
             const unsubTopics = onSnapshot(collection(window.db, "topics"), (snapshot) => {
               const loadedTopics = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
               setMeetingTopics(loadedTopics);
@@ -254,130 +251,201 @@
 
       const getPriorityBadgeClass = (p) => {
         switch (p) {
-          case "Yüksek": return "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-800";
-          case "Orta": return "bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200 dark:border-amber-800";
-          default: return "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800";
+          case "Yüksek": return "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20";
+          case "Orta": return "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20";
+          default: return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20";
         }
       };
 
-      return e("div", { className: "max-w-md mx-auto min-h-screen flex flex-col pb-10" },
+      // Tekil Görev Kartı Bileşeni
+      const renderTaskCard = (task) => {
+        const isEditing = editingTaskId === task.id;
+        return e("div", { 
+          key: task.id, 
+          className: "p-4 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-md transition-all duration-200" 
+        },
+          isEditing 
+            ? e("div", { className: "space-y-3" },
+              e("textarea", {
+                value: editTitle,
+                onChange: (ev) => setEditTitle(ev.target.value),
+                className: "w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none",
+                rows: "2"
+              }),
+              e("div", { className: "flex justify-end gap-2" },
+                e("button", { onClick: () => setEditingTaskId(null), className: "px-3 py-1.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium text-[11px] rounded-xl" }, "İptal"),
+                e("button", { onClick: () => saveEditing(task.id), className: "px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] rounded-xl shadow-sm" }, "Kaydet")
+              )
+            )
+            : e("div", { className: "space-y-2.5" },
+              e("div", { className: "flex items-start justify-between gap-3" },
+                e("div", { className: "flex items-start gap-3 flex-1" },
+                  e("button", {
+                    onClick: () => toggleTask(task.id),
+                    className: `w-5 h-5 mt-0.5 rounded-lg border transition-all flex items-center justify-center ${task.completed ? "bg-blue-600 border-blue-600 text-white" : "border-slate-300 dark:border-slate-600 hover:border-blue-500"}`
+                  }, task.completed ? "✓" : ""),
+                  e("p", { className: `text-xs leading-relaxed font-semibold transition-all ${task.completed ? "line-through text-slate-400 dark:text-slate-500" : "text-slate-800 dark:text-slate-100"}` }, task.title)
+                ),
+                e("div", { className: "flex items-center gap-1 opacity-70 hover:opacity-100" },
+                  e("button", { onClick: () => startEditing(task), className: "text-slate-400 hover:text-blue-600 text-xs p-1" }, "✏️"),
+                  e("button", { onClick: () => deleteTask(task.id), className: "text-slate-400 hover:text-red-600 text-xs p-1" }, "🗑️")
+                )
+              ),
+              task.image && e("img", { src: task.image, className: "max-h-48 w-full object-cover rounded-xl border border-slate-200 dark:border-slate-800" }),
+              e("div", { className: "flex items-center gap-1.5 pt-1" },
+                e("span", { className: `text-[10px] px-2.5 py-0.5 rounded-lg font-bold tracking-wide ${getPriorityBadgeClass(task.priority)}` }, task.priority || "Orta"),
+                e("span", { className: "text-[10px] px-2.5 py-0.5 rounded-lg font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/50 dark:border-slate-700/50" }, task.category || "Üretim")
+              )
+            )
+        );
+      };
+
+      return e("div", { className: "max-w-md mx-auto min-h-screen flex flex-col pb-12" },
         e("input", { type: "file", accept: "image/*", ref: fileInputRef, onChange: handleImageSelect, className: "hidden" }),
 
-        // Header
-        e("header", { className: "p-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 sticky top-0 z-30" },
-          e("div", { className: "flex items-center gap-2" },
-            e("div", { className: "w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-sm" }, "⚡"),
+        // Premium Navigation Bar
+        e("header", { className: "p-4 flex items-center justify-between backdrop-blur-xl bg-white/80 dark:bg-slate-900/80 sticky top-0 z-30 border-b border-slate-200/50 dark:border-slate-800/80 shadow-xs" },
+          e("div", { className: "flex items-center gap-2.5" },
+            e("div", { className: "w-9 h-9 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-black text-base shadow-md shadow-blue-500/20" }, "⚡"),
             e("div", null,
-              e("h1", { className: "font-bold text-sm text-slate-900 dark:text-white" }, "İş Asistanım"),
-              e("p", { className: "text-[10px] text-slate-400" }, isSyncing ? "🔄 Senkronize ediliyor..." : "☁️ Canlı Bulut Senkronize")
+              e("h1", { className: "font-black text-sm tracking-tight text-slate-900 dark:text-white" }, "İş Asistanım PRO"),
+              e("div", { className: "flex items-center gap-1.5 mt-0.5" },
+                e("span", { className: `w-1.5 h-1.5 rounded-full ${isSyncing ? "bg-amber-400 animate-pulse" : "bg-emerald-500"}` }),
+                e("span", { className: "text-[10px] font-bold text-slate-400" }, isSyncing ? "Eşitleniyor..." : "Bulut Aktif")
+              )
             )
           ),
-          e("div", { className: "flex items-center gap-1.5" },
-            e("button", { onClick: () => setDarkMode(!darkMode), className: "p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs" }, darkMode ? "☀️" : "🌙")
+          e("div", { className: "flex items-center gap-2" },
+            e("button", { 
+              onClick: () => setDarkMode(!darkMode), 
+              className: "p-2.5 rounded-2xl bg-slate-100/80 dark:bg-slate-800/80 hover:bg-slate-200 text-xs transition-all" 
+            }, darkMode ? "☀️" : "🌙")
           )
         ),
 
         e("main", { className: "p-4 space-y-4" },
-          // Search
-          e("div", { className: "relative" },
-            e("input", {
-              type: "text",
-              placeholder: "Görevlerde ara...",
-              value: searchQuery,
-              onChange: (ev) => setSearchQuery(ev.target.value),
-              className: "w-full pl-9 pr-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs"
-            }),
-            e("span", { className: "absolute left-3 top-3 text-slate-400 text-xs" }, "🔍")
+          
+          // Search & View Mode Switch
+          e("div", { className: "flex items-center gap-2" },
+            e("div", { className: "relative flex-1" },
+              e("input", {
+                type: "text",
+                placeholder: "Görev veya not ara...",
+                value: searchQuery,
+                onChange: (ev) => setSearchQuery(ev.target.value),
+                className: "w-full pl-9 pr-4 py-2.5 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              }),
+              e("span", { className: "absolute left-3 top-2.5 text-slate-400 text-xs" }, "🔍")
+            ),
+            activeTab === "daily" && e("div", { className: "flex bg-slate-200/70 dark:bg-slate-800/80 p-1 rounded-2xl gap-1" },
+              e("button", {
+                onClick: () => setViewMode("list"),
+                className: `px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${viewMode === "list" ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs" : "text-slate-500"}`
+              }, "☰"),
+              e("button", {
+                onClick: () => setViewMode("kanban"),
+                className: `px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${viewMode === "kanban" ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs" : "text-slate-500"}`
+              }, "⫸")
+            )
           ),
 
-          // Tabs
-          e("div", { className: "flex bg-slate-200/60 dark:bg-slate-800/80 p-1 rounded-2xl gap-1" },
+          // Main Tab Selector
+          e("div", { className: "flex bg-slate-200/60 dark:bg-slate-800/60 backdrop-blur-md p-1 rounded-2xl gap-1" },
             e("button", {
               onClick: () => setActiveTab("daily"),
-              className: `flex-1 py-2 text-xs font-bold rounded-xl ${activeTab === "daily" ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm" : "text-slate-500"}`
+              className: `flex-1 py-2.5 text-xs font-extrabold rounded-xl transition-all ${activeTab === "daily" ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm" : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"}`
             }, "☑️ Günlük Görevler"),
             e("button", {
               onClick: () => setActiveTab("meetings"),
-              className: `flex-1 py-2 text-xs font-bold rounded-xl ${activeTab === "meetings" ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm" : "text-slate-500"}`
+              className: `flex-1 py-2.5 text-xs font-extrabold rounded-xl transition-all ${activeTab === "meetings" ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm" : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"}`
             }, "📁 Toplantı Konuları")
           ),
 
-          // Calendar Strip
-          e("section", { className: "bg-white dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs" },
-            e("div", { className: "flex items-center justify-between mb-2 px-1" },
-              e("span", { className: "text-xs font-bold text-slate-700 dark:text-slate-200" }, `📅 ${selectedDate}`),
+          // Date Selector Strip
+          e("section", { className: "bg-white/70 dark:bg-slate-900/70 backdrop-blur-md p-3.5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-2.5" },
+            e("div", { className: "flex items-center justify-between px-1" },
+              e("span", { className: "text-xs font-extrabold tracking-tight text-slate-800 dark:text-slate-200" }, `📅 ${selectedDate}`),
               e("input", {
                 type: "date",
                 value: selectedDate,
                 onChange: (ev) => setSelectedDate(ev.target.value),
-                className: "text-xs bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-600"
+                className: "text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700 outline-none"
               })
             ),
-            e("div", { className: "flex gap-2 overflow-x-auto pb-1" },
+            e("div", { className: "flex gap-2 overflow-x-auto pb-0.5 scrollbar-none" },
               calendarDays.map((d) => {
                 const isSelected = d.iso === selectedDate;
                 return e("button", {
                   key: d.iso,
                   onClick: () => setSelectedDate(d.iso),
-                  className: `flex-shrink-0 w-11 py-2 rounded-xl flex flex-col items-center justify-center ${isSelected ? "bg-blue-600 text-white" : "bg-slate-50 dark:bg-slate-700/40 text-slate-600 dark:text-slate-300"}`
+                  className: `flex-shrink-0 w-12 py-2.5 rounded-2xl flex flex-col items-center justify-center transition-all ${isSelected ? "bg-gradient-to-b from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20 scale-105" : "bg-slate-100/80 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 hover:bg-slate-200/60"}`
                 },
-                  e("span", { className: "text-[10px]" }, d.dayName),
-                  e("span", { className: "text-xs font-bold mt-0.5" }, d.dayNum)
+                  e("span", { className: "text-[10px] font-medium" }, d.dayName),
+                  e("span", { className: "text-xs font-black mt-0.5" }, d.dayNum)
                 );
               })
             )
           ),
 
-          // Progress
-          e("div", { className: "bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-3.5 text-white flex items-center justify-between" },
-            e("div", null,
-              e("p", { className: "text-[10px] text-blue-100 font-semibold uppercase" }, "Günlük İlerleme"),
-              e("h3", { className: "text-sm font-bold mt-0.5" }, `${completedCount} / ${dayTasks.length} Tamamlandı`)
+          // Dashboard Card with Progress Ring
+          e("div", { className: "bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white rounded-3xl p-4 shadow-xl shadow-indigo-950/20 flex items-center justify-between relative overflow-hidden" },
+            e("div", { className: "space-y-1 relative z-10" },
+              e("span", { className: "text-[10px] font-extrabold uppercase tracking-widest text-blue-400" }, "Günlük Performans"),
+              e("h3", { className: "text-base font-black tracking-tight" }, `${completedCount} / ${dayTasks.length} Görev Tamam`),
+              e("p", { className: "text-[11px] text-slate-300 font-medium" }, dayTasks.length === completedCount && dayTasks.length > 0 ? "🎉 Harika, tüm işler bitti!" : "Gününüzü planlı tutun.")
             ),
-            e("div", { className: "text-sm font-extrabold bg-white/20 px-2.5 py-1 rounded-xl" }, `%${progressPercent}`)
+            
+            // Progress Ring (SVG)
+            e("div", { className: "relative w-16 h-16 flex items-center justify-center z-10" },
+              e("svg", { className: "w-full h-full -rotate-90", viewBox: "0 0 36 36" },
+                e("path", { className: "text-slate-800", strokeWidth: "3.8", stroke: "currentColor", fill: "none", d: "M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" }),
+                e("path", { className: "text-blue-500 transition-all duration-500", strokeDasharray: `${progressPercent}, 100`, strokeWidth: "3.8", strokeLinecap: "round", stroke: "currentColor", fill: "none", d: "M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" })
+              ),
+              e("span", { className: "absolute text-xs font-black text-white" }, `%${progressPercent}`)
+            )
           ),
 
-          // Action Buttons
+          // Action Buttons Bar
           e("div", { className: "grid grid-cols-3 gap-2" },
             e("button", {
               onClick: () => setShowAddForm(!showAddForm),
-              className: "p-2.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-2xl flex items-center justify-center gap-1.5 text-blue-600 dark:text-blue-400 font-bold text-xs"
+              className: "py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl flex items-center justify-center gap-1.5 font-extrabold text-xs shadow-md shadow-blue-500/20 transition-all"
             }, showAddForm ? "✖️ Kapat" : "➕ Yeni Görev"),
 
             e("button", {
               onClick: toggleListening,
-              className: `p-2.5 border rounded-2xl flex items-center justify-center gap-1.5 font-bold text-xs ${isListening ? "bg-red-500 text-white" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"}`
+              className: `py-3 border rounded-2xl flex items-center justify-center gap-1.5 font-extrabold text-xs transition-all ${isListening ? "bg-rose-500 text-white animate-pulse" : "bg-white/80 dark:bg-slate-900/80 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200"}`
             }, isListening ? "🎙️ Dinliyor..." : "🎙️ Sesle Ekle"),
 
             e("button", {
               onClick: () => fileInputRef.current && fileInputRef.current.click(),
-              className: "p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl flex items-center justify-center gap-1.5 text-slate-700 dark:text-slate-200 font-bold text-xs"
+              className: "py-3 bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center justify-center gap-1.5 text-slate-700 dark:text-slate-200 font-extrabold text-xs transition-all"
             }, "📷 Resim Ekle")
           ),
 
-          selectedImage && e("div", { className: "bg-white dark:bg-slate-800 p-2.5 rounded-2xl border border-blue-200 flex items-center justify-between" },
-            e("div", { className: "flex items-center gap-2" },
-              e("img", { src: selectedImage, className: "w-10 h-10 object-cover rounded-lg" }),
-              e("span", { className: "text-xs text-slate-600 dark:text-slate-300 font-medium" }, "Resim Eklendi")
+          selectedImage && e("div", { className: "bg-white/80 dark:bg-slate-900/80 p-3 rounded-2xl border border-blue-500/30 flex items-center justify-between" },
+            e("div", { className: "flex items-center gap-2.5" },
+              e("img", { src: selectedImage, className: "w-10 h-10 object-cover rounded-xl border" }),
+              e("span", { className: "text-xs font-bold text-slate-700 dark:text-slate-200" }, "Görsel Hazır")
             ),
-            e("button", { onClick: () => setSelectedImage(null), className: "text-red-500 text-xs font-bold" }, "Kaldır")
+            e("button", { onClick: () => setSelectedImage(null), className: "text-rose-500 text-xs font-extrabold" }, "Kaldır")
           ),
 
-          // Form
-          showAddForm && e("section", { className: "bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3" },
-            e("h3", { className: "text-xs font-bold text-slate-800 dark:text-slate-100" }, `✍️ ${selectedDate} İçin Yeni Görev`),
+          // New Task Form
+          showAddForm && e("section", { className: "bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-4 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-lg" },
+            e("h3", { className: "text-xs font-black text-slate-800 dark:text-slate-100" }, `✍️ ${selectedDate} İçin Yeni Görev`),
             e("textarea", {
               rows: "2",
               placeholder: "Görev detayını yazın...",
               value: newTaskTitle,
               onChange: (ev) => setNewTaskTitle(ev.target.value),
-              className: "w-full p-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-xs"
+              className: "w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-medium focus:ring-2 focus:ring-blue-500 outline-none"
             }),
             e("div", { className: "flex gap-2" },
               e("select", {
                 value: newTaskPriority,
                 onChange: (ev) => setNewTaskPriority(ev.target.value),
-                className: "flex-1 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-[11px] p-2 text-slate-700 dark:text-slate-200"
+                className: "flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-[11px] font-bold p-2.5 text-slate-700 dark:text-slate-200"
               },
                 e("option", { value: "Düşük" }, "🟢 Düşük Öncelik"),
                 e("option", { value: "Orta" }, "🟡 Orta Öncelik"),
@@ -386,7 +454,7 @@
               e("select", {
                 value: newTaskCategory,
                 onChange: (ev) => setNewTaskCategory(ev.target.value),
-                className: "flex-1 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-[11px] p-2 text-slate-700 dark:text-slate-200"
+                className: "flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-[11px] font-bold p-2.5 text-slate-700 dark:text-slate-200"
               },
                 e("option", { value: "Üretim" }, "⚙️ Üretim"),
                 e("option", { value: "Kalite" }, "🔍 Kalite"),
@@ -394,114 +462,94 @@
                 e("option", { value: "Kişisel" }, "👤 Kişisel")
               )
             ),
-            e("button", { onClick: () => addTask(), className: "w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-bold" }, "Kaydet ve Ekle")
+            e("button", { onClick: () => addTask(), className: "w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-black shadow-md shadow-blue-500/20" }, "Görev Oluştur")
           ),
 
-          // Daily Tab
-          activeTab === "daily" && e("div", { className: "space-y-2.5" },
-            dayTasks.length === 0 
-              ? e("div", { className: "p-8 text-center bg-white dark:bg-slate-800/60 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 text-slate-400 text-xs" }, "Görev bulunmuyor.")
-              : dayTasks.map(task => {
-                const isEditing = editingTaskId === task.id;
-                return e("div", { key: task.id, className: "p-3.5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700" },
-                  isEditing 
-                    ? e("div", { className: "space-y-2" },
-                      e("textarea", {
-                        value: editTitle,
-                        onChange: (ev) => setEditTitle(ev.target.value),
-                        className: "w-full p-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs",
-                        rows: "2"
-                      }),
-                      e("div", { className: "flex justify-end gap-2" },
-                        e("button", { onClick: () => setEditingTaskId(null), className: "px-3 py-1 bg-slate-200 dark:bg-slate-700 text-[11px] rounded-lg" }, "İptal"),
-                        e("button", { onClick: () => saveEditing(task.id), className: "px-3 py-1 bg-blue-600 text-white text-[11px] rounded-lg" }, "Kaydet")
-                      )
-                    )
-                    : e("div", { className: "space-y-2" },
-                      e("div", { className: "flex items-start justify-between gap-3" },
-                        e("div", { className: "flex items-start gap-2.5 flex-1" },
-                          e("input", {
-                            type: "checkbox",
-                            checked: !!task.completed,
-                            onChange: () => toggleTask(task.id),
-                            className: "w-4 h-4 mt-0.5 rounded border-slate-300 text-blue-600 cursor-pointer accent-blue-600"
-                          }),
-                          e("p", { className: `text-xs leading-relaxed font-medium ${task.completed ? "line-through text-slate-400" : "text-slate-800 dark:text-slate-100"}` }, task.title)
-                        ),
-                        e("div", { className: "flex items-center gap-1" },
-                          e("button", { onClick: () => startEditing(task), className: "text-slate-400 text-xs p-1" }, "✏️"),
-                          e("button", { onClick: () => deleteTask(task.id), className: "text-slate-400 text-xs p-1" }, "🗑️")
-                        )
-                      ),
-                      task.image && e("img", { src: task.image, className: "max-h-48 w-full object-cover rounded-xl border border-slate-100 dark:border-slate-700" }),
-                      e("div", { className: "flex items-center gap-1.5 pt-1" },
-                        e("span", { className: `text-[9px] px-2 py-0.5 rounded-md font-semibold ${getPriorityBadgeClass(task.priority)}` }, task.priority || "Orta"),
-                        e("span", { className: "text-[9px] px-2 py-0.5 rounded-md font-semibold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300" }, task.category || "Üretim")
-                      )
-                    )
-                );
-              })
+          // Daily Tasks Content
+          activeTab === "daily" && (
+            viewMode === "list"
+              ? e("div", { className: "space-y-2.5" },
+                dayTasks.length === 0 
+                  ? e("div", { className: "p-8 text-center bg-white/40 dark:bg-slate-900/40 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 text-slate-400 text-xs font-medium" }, "Bu tarih için henüz görev bulunmuyor.")
+                  : dayTasks.map(task => renderTaskCard(task))
+              )
+              : e("div", { className: "grid grid-cols-2 gap-3" },
+                e("div", { className: "space-y-2" },
+                  e("div", { className: "flex items-center justify-between px-1" },
+                    e("span", { className: "text-[11px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider" }, "⏳ Devam Eden"),
+                    e("span", { className: "text-[10px] font-bold bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded-full" }, dayTasks.filter(t => !t.completed).length)
+                  ),
+                  dayTasks.filter(t => !t.completed).map(task => renderTaskCard(task))
+                ),
+                e("div", { className: "space-y-2" },
+                  e("div", { className: "flex items-center justify-between px-1" },
+                    e("span", { className: "text-[11px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider" }, "✅ Tamamlanan"),
+                    e("span", { className: "text-[10px] font-bold bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-full" }, dayTasks.filter(t => t.completed).length)
+                  ),
+                  dayTasks.filter(t => t.completed).map(task => renderTaskCard(task))
+                )
+              )
           ),
 
-          // Meetings Tab
+          // Meetings Content
           activeTab === "meetings" && e("div", { className: "space-y-3" },
-            e("section", { className: "bg-white dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2" },
-              e("h3", { className: "text-xs font-bold text-slate-800 dark:text-slate-100" }, "📁 Yeni Toplantı / Proje Başlığı"),
+            e("section", { className: "bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-4 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-2.5 shadow-xs" },
+              e("h3", { className: "text-xs font-black text-slate-800 dark:text-slate-100" }, "📁 Yeni Proje / Toplantı Başlığı"),
               e("div", { className: "flex gap-2" },
                 e("input", {
                   type: "text",
-                  placeholder: "Örn: Kalite Analizleri...",
+                  placeholder: "Örn: Alüminyum Gövde Revizyonu...",
                   value: newTopicTitle,
                   onChange: (ev) => setNewTopicTitle(ev.target.value),
-                  className: "flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-xs"
+                  className: "flex-1 px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
                 }),
-                e("button", { onClick: addMeetingTopic, className: "px-3 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold" }, "Aç")
+                e("button", { onClick: addMeetingTopic, className: "px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-black shadow-md shadow-blue-500/20" }, "Aç")
               )
             ),
-            e("div", { className: "space-y-2.5" },
+            e("div", { className: "space-y-3" },
               meetingTopics.map((topic) => {
                 const isExpanded = selectedTopicId === topic.id;
                 const notesList = topic.notes || [];
 
-                return e("div", { key: topic.id, className: "bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden" },
+                return e("div", { key: topic.id, className: "bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs" },
                   e("div", {
                     onClick: () => setSelectedTopicId(isExpanded ? null : topic.id),
-                    className: "p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/30"
+                    className: "p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-all"
                   },
-                    e("div", { className: "flex items-center gap-2.5" },
-                      e("span", { className: "text-base" }, "📁"),
+                    e("div", { className: "flex items-center gap-3" },
+                      e("div", { className: "w-8 h-8 rounded-xl bg-blue-50 dark:bg-slate-800 flex items-center justify-center text-sm" }, "📁"),
                       e("div", null,
                         e("h4", { className: "font-bold text-xs text-slate-800 dark:text-slate-100" }, topic.title),
-                        e("p", { className: "text-[10px] text-slate-400 mt-0.5" }, `${notesList.length} Not`)
+                        e("p", { className: "text-[10px] text-slate-400 font-medium mt-0.5" }, `${notesList.length} Not`)
                       )
                     ),
-                    e("span", { className: "text-slate-400 text-xs" }, isExpanded ? "▲" : "▼")
+                    e("span", { className: "text-slate-400 text-xs font-bold" }, isExpanded ? "▲" : "▼")
                   ),
-                  isExpanded && e("div", { className: "p-3.5 pt-0 border-t border-slate-100 dark:border-slate-700/50 space-y-3 bg-slate-50/50 dark:bg-slate-800/40" },
+                  isExpanded && e("div", { className: "p-4 pt-0 border-t border-slate-100 dark:border-slate-800/80 space-y-3 bg-slate-50/30 dark:bg-slate-900/30" },
                     e("div", { className: "mt-3 space-y-2" },
-                      e("label", { className: "text-[10px] font-bold text-blue-600 dark:text-blue-400 block" }, `➕ (${selectedDate}) Tarihli Not Ekle:`),
+                      e("label", { className: "text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider block" }, `➕ (${selectedDate}) Not Ekle:`),
                       e("textarea", {
                         rows: "2",
-                        placeholder: "Not yazın...",
+                        placeholder: "Not detaylarını girin...",
                         value: newNoteContent,
                         onChange: (ev) => setNewNoteContent(ev.target.value),
-                        className: "w-full p-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs"
+                        className: "w-full p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
                       }),
-                      e("button", { onClick: () => addNoteToTopic(topic.id), className: "w-full py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold" }, "Notu Kaydet")
+                      e("button", { onClick: () => addNoteToTopic(topic.id), className: "w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-black shadow-sm" }, "Notu Kaydet")
                     ),
                     e("div", { className: "space-y-2 pt-1" },
-                      notesList.map((note) => e("div", { key: note.id, className: "p-2.5 bg-white dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 space-y-1" },
+                      notesList.map((note) => e("div", { key: note.id, className: "p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 space-y-1.5 shadow-xs" },
                         e("div", { className: "flex justify-between items-center" },
-                          e("span", { className: "text-[9px] font-bold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-950 px-1.5 py-0.5 rounded" }, `📅 ${note.date}`),
+                          e("span", { className: "text-[9px] font-bold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/80 px-2 py-0.5 rounded-lg border border-blue-200 dark:border-blue-900" }, `📅 ${note.date}`),
                           e("button", {
                             onClick: () => {
                               addTask(`[${topic.title}] ${note.content}`);
-                              alert("Not görevlere aktarıldı!");
+                              alert("Not günlük görevlere başarıyla aktarıldı!");
                             },
-                            className: "text-[10px] text-indigo-600 dark:text-indigo-300 font-semibold"
+                            className: "text-[10px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline"
                           }, "➡️ Göreve Aktar")
                         ),
-                        e("p", { className: "text-xs text-slate-700 dark:text-slate-200 leading-relaxed" }, note.content)
+                        e("p", { className: "text-xs text-slate-700 dark:text-slate-200 leading-relaxed font-medium" }, note.content)
                       ))
                     )
                   )
