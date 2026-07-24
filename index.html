@@ -4,96 +4,379 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kişisel Verimlilik Paneli</title>
-    <link rel="stylesheet" href="style.css">
-    <!-- SF Pro benzeri font ve Apple ikon hissiyatı için -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-color: #f2f2f7;
+            --card-bg: rgba(255, 255, 255, 0.85);
+            --accent-color: #007aff;
+            --text-primary: #1c1c1e;
+            --text-secondary: #8e8e93;
+            --border-color: rgba(200, 200, 205, 0.5);
+            --radius: 14px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            display: flex;
+            justify-content: center;
+            padding: 12px;
+            min-height: 100vh;
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 800px;
+            background: #ffffff;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+        }
+
+        /* Üst / Yan Menü Navigasyonu */
+        .sidebar {
+            background: #f9f9fb;
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .profile-section h2 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .nav-menu {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+        }
+
+        .nav-btn {
+            flex: 1;
+            padding: 10px 14px;
+            border: none;
+            background: #e5e5ea;
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .nav-btn.active {
+            background: var(--accent-color);
+            color: white;
+        }
+
+        /* İçerik Alanı */
+        .main-content {
+            padding: 20px;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .section-header {
+            margin-bottom: 16px;
+        }
+
+        .section-header h1 {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        /* Kartlar ve Formlar */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .add-card {
+            display: flex;
+            gap: 8px;
+        }
+
+        .flex-col {
+            flex-direction: column;
+        }
+
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: #f9f9fb;
+            outline: none;
+            font-size: 15px;
+            margin-bottom: 8px;
+        }
+
+        .apple-btn {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 12px 18px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        /* Liste Yapısı */
+        .apple-list {
+            list-style: none;
+        }
+
+        .apple-list li {
+            background: #f9f9fb;
+            border: 1px solid var(--border-color);
+            padding: 14px;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Dosya Yükleme */
+        .file-upload-wrapper {
+            margin: 8px 0 12px 0;
+        }
+
+        .file-label {
+            display: inline-block;
+            background: #e5e5ea;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        #note-file {
+            display: none;
+        }
+
+        #file-name-display {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-left: 8px;
+        }
+
+        /* Takvim */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+            text-align: center;
+            margin-top: 12px;
+        }
+
+        .calendar-day {
+            padding: 10px 4px;
+            border-radius: 8px;
+            background: #f9f9fb;
+            font-size: 13px;
+        }
+
+        .calendar-day.today {
+            background: var(--accent-color);
+            color: white;
+            font-weight: bold;
+        }
+
+        /* Masaüstü Uyumu */
+        @media (min-width: 600px) {
+            .app-container {
+                flex-direction: row;
+            }
+            .sidebar {
+                width: 220px;
+                border-right: 1px solid var(--border-color);
+                border-bottom: none;
+            }
+            .nav-menu {
+                flex-direction: column;
+            }
+            .main-content {
+                flex: 1;
+            }
+        }
+    </style>
 </head>
 <body>
+
     <div class="app-container">
-        <!-- Sol Menü / Sidebar -->
+        <!-- Navigasyon -->
         <aside class="sidebar">
             <div class="profile-section">
-                <div class="avatar"><i class="fa-solid fa-user"></i></div>
                 <h2>Verimlilik Paneli</h2>
             </div>
             <nav class="nav-menu">
-                <button class="nav-btn active" onclick="switchTab('tasks')">
-                    <i class="fa-solid fa-check-square"></i> Görevler
-                </button>
-                <button class="nav-btn" onclick="switchTab('calendar')">
-                    <i class="fa-solid fa-calendar-days"></i> Takvim
-                </button>
-                <button class="nav-btn" onclick="switchTab('notes')">
-                    <i class="fa-solid fa-note-sticky"></i> Toplantı Notları
-                </button>
+                <button class="nav-btn active" onclick="switchTab('tasks', this)">Görevler</button>
+                <button class="nav-btn" onclick="switchTab('calendar', this)">Takvim</button>
+                <button class="nav-btn" onclick="switchTab('notes', this)">Toplantı Notları</button>
             </nav>
         </aside>
 
-        <!-- Ana İçerik Alanı -->
+        <!-- Ana İçerik -->
         <main class="main-content">
             
-            <!-- GÖREVLER SEKMESİ -->
+            <!-- GÖREVLER -->
             <section id="tasks" class="tab-content active">
                 <header class="section-header">
                     <h1>Görevler</h1>
-                    <span class="date-badge" id="current-date"></span>
                 </header>
-
                 <div class="card add-card">
-                    <input type="text" id="task-input" placeholder="Yeni bir görev ekleyin...">
+                    <input type="text" id="task-input" placeholder="Yeni görev ekleyin...">
                     <button class="apple-btn" onclick="addTask()">Ekle</button>
                 </div>
-
-                <ul id="task-list" class="apple-list">
-                    <!-- Görevler JS ile buraya yüklenecek -->
-                </ul>
+                <ul id="task-list" class="apple-list"></ul>
             </section>
 
-            <!-- TAKVİM SEKMESİ -->
+            <!-- TAKVİM -->
             <section id="calendar" class="tab-content">
                 <header class="section-header">
-                    <h1>Takvim & Etkinlikler</h1>
+                    <h1 id="calendar-month-year">Takvim</h1>
                 </header>
                 <div class="card">
-                    <div class="calendar-header">
-                        <h3 id="calendar-month-year"></h3>
-                    </div>
-                    <div class="calendar-grid" id="calendar-grid">
-                        <!-- Takvim günleri JS ile oluşturulacak -->
-                    </div>
+                    <div class="calendar-grid" id="calendar-grid"></div>
                 </div>
             </section>
 
-            <!-- TOPLANTI NOTLARI SEKMESİ -->
+            <!-- TOPLANTI NOTLARI -->
             <section id="notes" class="tab-content">
                 <header class="section-header">
                     <h1>Toplantı Notları</h1>
                 </header>
-                
                 <div class="card add-card flex-col">
                     <input type="text" id="note-title" placeholder="Toplantı Başlığı">
-                    <textarea id="note-body" placeholder="Notlarınızı buraya yazın..." rows="4"></textarea>
+                    <textarea id="note-body" placeholder="Notlarınızı yazın..." rows="3"></textarea>
                     
-                    <!-- Dosya / Fotoğraf Yükleme Alanı -->
                     <div class="file-upload-wrapper">
-                        <label for="note-file" class="file-label">
-                            <i class="fa-solid fa-paperclip"></i> Fotoğraf veya Ek Ekle
-                        </label>
-                        <input type="file" id="note-file" accept="image/*,application/pdf" multiple onchange="handleFileSelect(event)">
-                        <span id="file-name-display">Dosya seçilmedi</span>
+                        <label for="note-file" class="file-label">📎 Dosya / Fotoğraf Seç</label>
+                        <input type="file" id="note-file" accept="image/*,application/pdf" onchange="handleFileSelect(event)">
+                        <span id="file-name-display">Seçilmedi</span>
                     </div>
 
-                    <button class="apple-btn align-self-end" onclick="addNote()">Notu Kaydet</button>
+                    <button class="apple-btn" style="align-self: flex-end;" onclick="addNote()">Kaydet</button>
                 </div>
-
-                <div id="notes-list" class="notes-grid">
-                    <!-- Notlar JS ile buraya eklenecek -->
-                </div>
+                <div id="notes-list"></div>
             </section>
 
         </main>
     </div>
 
-    <script src="script.js"></script>
+    <script>
+        // Sekme Mantığı
+        function switchTab(tabId, btn) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            
+            document.getElementById(tabId).classList.add('active');
+            btn.classList.add('active');
+
+            if(tabId === 'calendar') renderCalendar();
+        }
+
+        // Görevler
+        let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+        function renderTasks() {
+            const list = document.getElementById('task-list');
+            list.innerHTML = '';
+            tasks.forEach((t, i) => {
+                list.innerHTML += `<li><span>${t}</span><button onclick="deleteTask(${i})" style="color:red; border:none; background:none; cursor:pointer;">Sil</button></li>`;
+            });
+        }
+        function addTask() {
+            const input = document.getElementById('task-input');
+            if (input.value.trim()) {
+                tasks.push(input.value);
+                localStorage.setItem('tasks', JSON.stringify(tasks));
+                input.value = '';
+                renderTasks();
+            }
+        }
+        function deleteTask(i) {
+            tasks.splice(i, 1);
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+            renderTasks();
+        }
+
+        // Dosya Seçimi
+        let selectedFileBase64 = '';
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) {
+                document.getElementById('file-name-display').innerText = file.name;
+                const r = new FileReader();
+                r.onload = (ev) => selectedFileBase64 = ev.target.result;
+                r.readAsDataURL(file);
+            }
+        }
+
+        // Notlar
+        let notes = JSON.parse(localStorage.getItem('notes')) || [];
+        function renderNotes() {
+            const container = document.getElementById('notes-list');
+            container.innerHTML = '';
+            notes.forEach((n) => {
+                let img = n.file ? `<img src="${n.file}" style="max-width:100%; border-radius:8px; margin-top:8px;">` : '';
+                container.innerHTML += `<div class="card"><h3>${n.title}</h3><p style="margin-top:6px;">${n.body}</p>${img}<br><small style="color:gray;">${n.date}</small></div>`;
+            });
+        }
+        function addNote() {
+            const title = document.getElementById('note-title').value;
+            const body = document.getElementById('note-body').value;
+            if (title && body) {
+                notes.push({ title, body, file: selectedFileBase64, date: new Date().toLocaleString('tr-TR') });
+                localStorage.setItem('notes', JSON.stringify(notes));
+                document.getElementById('note-title').value = '';
+                document.getElementById('note-body').value = '';
+                document.getElementById('file-name-display').innerText = 'Seçilmedi';
+                selectedFileBase64 = '';
+                renderNotes();
+            }
+        }
+
+        // Takvim
+        function renderCalendar() {
+            const grid = document.getElementById('calendar-grid');
+            const monthYear = document.getElementById('calendar-month-year');
+            grid.innerHTML = '';
+            const now = new Date();
+            monthYear.innerText = now.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
+            const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+            for (let i = 1; i <= days; i++) {
+                const today = i === now.getDate() ? 'today' : '';
+                grid.innerHTML += `<div class="calendar-day ${today}">${i}</div>`;
+            }
+        }
+
+        // İlk Çalıştırma
+        renderTasks();
+        renderNotes();
+    </script>
 </body>
 </html>
