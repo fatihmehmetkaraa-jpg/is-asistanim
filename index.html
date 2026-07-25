@@ -48,7 +48,7 @@
     const e = React.createElement;
     const { useState, useEffect, useRef } = React;
 
-    // Resim Sıkıştırma Fonksiyonu
+    // Resim Sıkıştırma
     const compressImage = (file, maxWidth = 800, quality = 0.7, callback) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -80,29 +80,57 @@
     function App() {
       const todayISO = new Date().toISOString().split("T")[0];
 
+      // Güvenlik & Oturum
+      const [isAuthenticated, setIsAuthenticated] = useState(() => {
+        return localStorage.getItem("app_authenticated") === "true";
+      });
+      const [userPin, setUserPin] = useState(() => localStorage.getItem("app_pin") || "");
+      const [inputPin, setInputPin] = useState("");
+      const [inputCred, setInputCred] = useState("");
+
+      // Tema ve Arka Plan
       const [darkMode, setDarkMode] = useState(false);
+      const [bgPattern, setBgPattern] = useState(() => localStorage.getItem("app_bg") || "default");
+      const [customBgUrl, setCustomBgUrl] = useState(() => localStorage.getItem("app_bg_custom") || "");
+      const [showSettings, setShowSettings] = useState(false);
+
+      // Navigasyon
       const [activeTab, setActiveTab] = useState("daily");
       const [selectedDate, setSelectedDate] = useState(todayISO);
-
-      // Klasör ve Oturum
       const [selectedFolderId, setSelectedFolderId] = useState(null);
       const [selectedSessionId, setSelectedSessionId] = useState(null);
 
-      // Resim Önizleme Modal State
+      // Modallar
       const [previewImageUrl, setPreviewImageUrl] = useState(null);
+      const [editingItem, setEditingItem] = useState(null); // { type: 'task' | 'note', data: ... }
 
-      // Ref'ler
+      // Medya ve Refler
       const taskFileInputRef = useRef(null);
-      const [selectedTaskImage, setSelectedTaskImage] = useState(null);
-
       const meetingFileInputRef = useRef(null);
+      const bgFileInputRef = useRef(null);
+
+      const [selectedTaskImage, setSelectedTaskImage] = useState(null);
       const [selectedMeetingImage, setSelectedMeetingImage] = useState(null);
 
-      // Data State
+      const [taskAudioBlob, setTaskAudioBlob] = useState(null);
+      const [meetingAudioBlob, setMeetingAudioBlob] = useState(null);
+
+      // Sesli Mod Kontrolleri
+      const [speechTarget, setSpeechTarget] = useState(null); // 'task' | 'note'
+      const [showAudioMenu, setShowAudioMenu] = useState(null); // 'task' | 'note'
+      const [isLiveListening, setIsLiveListening] = useState(false);
+      const [liveTranscript, setLiveTranscript] = useState("");
+      const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+
+      const recognitionRef = useRef(null);
+      const mediaRecorderRef = useRef(null);
+      const audioChunksRef = useRef([]);
+
+      // Veriler
       const [tasks, setTasks] = useState([]);
       const [meetingTopics, setMeetingTopics] = useState([]);
 
-      // Form State'leri
+      // Formlar
       const [showAddForm, setShowAddForm] = useState(false);
       const [newTaskTitle, setNewTaskTitle] = useState("");
       const [newTaskPriority, setNewTaskPriority] = useState("Yüksek");
@@ -113,10 +141,9 @@
       const [newNoteContent, setNewNoteContent] = useState("");
       const [newNoteAssignee, setNewNoteAssignee] = useState("");
 
-      const [isListeningTask, setIsListeningTask] = useState(false);
-      const [isListeningNote, setIsListeningNote] = useState(false);
       const [isSyncing, setIsSyncing] = useState(true);
 
+      // Tarih Listesi
       const generateDateList = () => {
         const dates = [];
         const base = new Date();
@@ -138,6 +165,7 @@
         else document.documentElement.classList.remove('dark');
       }, [darkMode]);
 
+      // Firebase Senkronizasyonu
       useEffect(() => {
         const checkDb = setInterval(() => {
           if (window.db && window.dbFuncs) {
@@ -171,6 +199,126 @@
         return () => clearInterval(checkDb);
       }, []);
 
+      // Güvenlik Doğrulama
+      const handleAuthSubmit = () => {
+        const storedPin = localStorage.getItem("app_pin");
+        if (!storedPin) {
+          if (!inputPin.trim()) return alert("Lütfen bir PIN/Şifre belirleyin.");
+          localStorage.setItem("app_pin", inputPin);
+          localStorage.setItem("app_cred", inputCred);
+          localStorage.setItem("app_authenticated", "true");
+          setIsAuthenticated(true);
+        } else {
+          if (inputPin === storedPin) {
+            localStorage.setItem("app_authenticated", "true");
+            setIsAuthenticated(true);
+          } else {
+            alert("Hatalı Şifre/PIN!");
+          }
+        }
+      };
+
+      const handleLogout = () => {
+        localStorage.removeItem("app_authenticated");
+        setIsAuthenticated(false);
+      };
+
+      // Tema Değişimi
+      const handleBgChange = (type) => {
+        setBgPattern(type);
+        localStorage.setItem("app_bg", type);
+      };
+
+      // CANLI SES TANIMA (Transkript)
+      const startLiveListening = (target) => {
+        if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
+          return alert("Tarayıcınız ses tanıma özelliğini desteklemiyor.");
+        }
+
+        stopAllAudioControls();
+        setSpeechTarget(target);
+        setIsLiveListening(true);
+        setLiveTranscript("");
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.lang = "tr-TR";
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onresult = (event) => {
+          let currentText = "";
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            currentText += event.results[i][0].transcript;
+          }
+          setLiveTranscript(currentText);
+
+          if (target === "task") {
+            setNewTaskTitle(currentText);
+            setShowAddForm(true);
+          } else if (target === "note") {
+            setNewNoteContent(currentText);
+          }
+        };
+
+        recognition.onerror = () => stopAllAudioControls();
+        recognition.onend = () => setIsLiveListening(false);
+
+        recognitionRef.current = recognition;
+        recognition.start();
+      };
+
+      // SES KAYDI (Audio File)
+      const startAudioRecording = (target) => {
+        stopAllAudioControls();
+        setSpeechTarget(target);
+
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+          const mediaRecorder = new MediaRecorder(stream);
+          mediaRecorderRef.current = mediaRecorder;
+          audioChunksRef.current = [];
+
+          mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) audioChunksRef.current.push(e.data);
+          };
+
+          mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+            const reader = new FileReader();
+            reader.readAsDataURL(audioBlob);
+            reader.onloadend = () => {
+              const base64Audio = reader.result;
+              if (target === "task") {
+                setTaskAudioBlob(base64Audio);
+                setShowAddForm(true);
+              } else if (target === "note") {
+                setMeetingAudioBlob(base64Audio);
+              }
+            };
+            stream.getTracks().forEach(track => track.stop());
+          };
+
+          mediaRecorder.start();
+          setIsRecordingAudio(true);
+        }).catch(err => alert("Mikrofon izni alınamadı: " + err));
+      };
+
+      // Mikrofonu Tam Kapatma Fonksiyonu
+      const stopAllAudioControls = () => {
+        if (recognitionRef.current) {
+          recognitionRef.current.stop();
+          recognitionRef.current = null;
+        }
+        if (mediaRecorderRef.current && isRecordingAudio) {
+          mediaRecorderRef.current.stop();
+          mediaRecorderRef.current = null;
+        }
+        setIsLiveListening(false);
+        setIsRecordingAudio(false);
+        setShowAudioMenu(null);
+      };
+
+      // Firebase İşlemleri
       const saveTaskToFirebase = async (taskObj) => {
         if (!window.db) return;
         const { doc, setDoc } = window.dbFuncs;
@@ -189,58 +337,23 @@
         await setDoc(doc(window.db, "topics", topicObj.id), topicObj);
       };
 
-      const toggleListeningTask = () => {
-        if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) return alert("Tarayıcı desteği yok.");
-        if (isListeningTask) setIsListeningTask(false);
-        else {
-          setIsListeningTask(true);
-          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-          const recognition = new SpeechRecognition();
-          recognition.lang = "tr-TR";
-          recognition.onresult = (ev) => {
-            setNewTaskTitle(ev.results[0][0].transcript);
-            setIsListeningTask(false);
-            setShowAddForm(true);
-          };
-          recognition.onend = () => setIsListeningTask(false);
-          recognition.start();
-        }
-      };
-
-      const toggleListeningNote = () => {
-        if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) return alert("Tarayıcı desteği yok.");
-        if (isListeningNote) setIsListeningNote(false);
-        else {
-          setIsListeningNote(true);
-          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-          const recognition = new SpeechRecognition();
-          recognition.lang = "tr-TR";
-          recognition.onresult = (ev) => {
-            const text = ev.results[0][0].transcript;
-            setNewNoteContent((prev) => (prev ? prev + " " + text : text));
-            setIsListeningNote(false);
-          };
-          recognition.onend = () => setIsListeningNote(false);
-          recognition.start();
-        }
-      };
-
-      const addTask = (titleToUse) => {
-        const title = titleToUse || newTaskTitle;
-        if (!title.trim() && !selectedTaskImage) return;
+      const addTask = () => {
+        if (!newTaskTitle.trim() && !selectedTaskImage && !taskAudioBlob) return;
         const newTask = {
           id: Date.now().toString(),
-          title: title || "Görsel Not",
+          title: newTaskTitle || "Sesli Görev / Görsel",
           date: selectedDate,
           completed: false,
           priority: newTaskPriority || "Yüksek",
           category: newTaskCategory || "Üretim",
           image: selectedTaskImage,
+          audio: taskAudioBlob,
           isRollover: false
         };
         saveTaskToFirebase(newTask);
         setNewTaskTitle("");
         setSelectedTaskImage(null);
+        setTaskAudioBlob(null);
         setShowAddForm(false);
       };
 
@@ -274,16 +387,14 @@
           notes: []
         };
 
-        const updatedFolder = {
+        saveTopicToFirebase({
           ...folder,
           sessions: [newSession, ...currentSessions]
-        };
-
-        saveTopicToFirebase(updatedFolder);
+        });
       };
 
       const addNoteToSession = (folderId, sessionId) => {
-        if (!newNoteContent.trim() && !selectedMeetingImage) return;
+        if (!newNoteContent.trim() && !selectedMeetingImage && !meetingAudioBlob) return;
         const folder = meetingTopics.find(f => f.id === folderId);
         if (!folder) return;
 
@@ -293,9 +404,10 @@
               ...sess,
               notes: [{
                 id: "n_" + Date.now(),
-                content: newNoteContent,
+                content: newNoteContent || "Ses Kaydı / Not",
                 assignee: newNoteAssignee || "Atanmadı",
                 image: selectedMeetingImage,
+                audio: meetingAudioBlob,
                 date: todayISO
               }, ...(sess.notes || [])]
             };
@@ -307,6 +419,30 @@
         setNewNoteContent("");
         setNewNoteAssignee("");
         setSelectedMeetingImage(null);
+        setMeetingAudioBlob(null);
+      };
+
+      // Düzenlenen Ögeyi Kaydetme
+      const saveEditedItem = () => {
+        if (!editingItem) return;
+        if (editingItem.type === "task") {
+          saveTaskToFirebase(editingItem.data);
+        } else if (editingItem.type === "note") {
+          const folder = meetingTopics.find(f => f.id === selectedFolderId);
+          if (folder) {
+            const updatedSessions = (folder.sessions || []).map(sess => {
+              if (sess.id === selectedSessionId) {
+                return {
+                  ...sess,
+                  notes: (sess.notes || []).map(n => n.id === editingItem.data.id ? editingItem.data : n)
+                };
+              }
+              return sess;
+            });
+            saveTopicToFirebase({ ...folder, sessions: updatedSessions });
+          }
+        }
+        setEditingItem(null);
       };
 
       const exportSessionPDF = (folderTitle, session) => {
@@ -360,7 +496,6 @@
       const activeSessionObj = activeFolderObj?.sessions?.find(s => s.id === selectedSessionId);
       const filteredTasks = tasks.filter(t => t.date === selectedDate);
 
-      // Öncelik Rozeti Rengi Helper
       const getPriorityBadgeClass = (priority) => {
         switch (priority) {
           case "Yüksek": return "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 border-rose-200 dark:border-rose-800";
@@ -370,9 +505,60 @@
         }
       };
 
-      return e("div", { className: "max-w-md mx-auto min-h-screen flex flex-col pb-12 relative" },
+      // Arka Plan Stil Oluşturma
+      const getBgStyle = () => {
+        if (bgPattern === "custom" && customBgUrl) {
+          return { backgroundImage: `url(${customBgUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+        }
+        if (bgPattern === "dots") {
+          return { backgroundImage: 'radial-gradient(circle, #cbd5e1 1px, transparent 1px)', backgroundSize: '16px 16px' };
+        }
+        if (bgPattern === "grid") {
+          return { backgroundImage: 'linear-gradient(to right, #e2e8f0 1px, transparent 1px), linear-gradient(to bottom, #e2e8f0 1px, transparent 1px)', backgroundSize: '20px 20px' };
+        }
+        return {};
+      };
+
+      /* ---------------- GİRİŞ / KİLİT EKRANI ---------------- */
+      if (!isAuthenticated) {
+        const isFirstSetup = !localStorage.getItem("app_pin");
+        return e("div", { className: "min-h-screen flex items-center justify-center p-4 bg-slate-900 text-white" },
+          e("div", { className: "w-full max-w-sm bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-2xl space-y-4 text-center" },
+            e("div", { className: "w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto text-xl font-black shadow-lg" }, "🔒"),
+            e("h2", { className: "text-lg font-black" }, isFirstSetup ? "Güvenlik Kurulumu" : "Giriş Yapın"),
+            e("p", { className: "text-xs text-slate-400" }, isFirstSetup ? "Uygulama için bir e-posta/tel ve PIN belirleyin." : "Devam etmek için PIN kodunuzu girin."),
+            
+            isFirstSetup && e("input", {
+              type: "text",
+              placeholder: "E-posta veya Tel No",
+              value: inputCred,
+              onChange: (ev) => setInputCred(ev.target.value),
+              className: "w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-xs text-center outline-none"
+            }),
+
+            e("input", {
+              type: "password",
+              placeholder: "4 Haneli PIN / Şifre",
+              value: inputPin,
+              onChange: (ev) => setInputPin(ev.target.value),
+              className: "w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-bold text-center tracking-widest outline-none"
+            }),
+
+            e("button", {
+              onClick: handleAuthSubmit,
+              className: "w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-black text-xs transition-all shadow-lg"
+            }, isFirstSetup ? "Kaydet ve Başla" : "Giriş Yap")
+          )
+        );
+      }
+
+      /* ---------------- ANA UYGULAMA ARAYÜZÜ ---------------- */
+      return e("div", { 
+        style: getBgStyle(),
+        className: "max-w-md mx-auto min-h-screen flex flex-col pb-12 relative transition-all" 
+      },
         
-        // TAM EKRAN RESİM İNCELEME MODALI
+        // Modal: Görsel Önizleme
         previewImageUrl && e("div", {
           className: "fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm",
           onClick: () => setPreviewImageUrl(null)
@@ -382,26 +568,87 @@
               onClick: () => setPreviewImageUrl(null),
               className: "absolute -top-10 right-0 text-white bg-slate-800/80 p-2 rounded-full text-xs font-bold w-8 h-8 flex items-center justify-center shadow-lg"
             }, "✕"),
-            e("img", {
-              src: previewImageUrl,
-              className: "max-w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl border border-white/20"
-            })
+            e("img", { src: previewImageUrl, className: "max-w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl border border-white/20" })
           )
         ),
 
-        // File Inputs
+        // Modal: Düzenleme (Görev & Not)
+        editingItem && e("div", {
+          className: "fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs"
+        },
+          e("div", { className: "w-full bg-white dark:bg-slate-900 p-4 rounded-2xl space-y-3 shadow-2xl border border-slate-200 dark:border-slate-800" },
+            e("h3", { className: "font-black text-xs text-slate-800 dark:text-white" }, "✏️ İçeriği Düzenle"),
+            
+            e("textarea", {
+              rows: "3",
+              value: editingItem.data.title || editingItem.data.content || "",
+              onChange: (ev) => {
+                const val = ev.target.value;
+                setEditingItem(prev => ({
+                  ...prev,
+                  data: { ...prev.data, [prev.type === "task" ? "title" : "content"]: val }
+                }));
+              },
+              className: "w-full p-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs outline-none font-medium"
+            }),
+
+            editingItem.type === "task" && e("div", { className: "flex gap-2" },
+              e("select", {
+                value: editingItem.data.priority,
+                onChange: (ev) => setEditingItem(prev => ({ ...prev, data: { ...prev.data, priority: ev.target.value } })),
+                className: "flex-1 p-1.5 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs font-bold outline-none"
+              },
+                e("option", { value: "Yüksek" }, "🔴 Yüksek"),
+                e("option", { value: "Orta" }, "🟠 Orta"),
+                e("option", { value: "Düşük" }, "🟢 Düşük")
+              ),
+              e("select", {
+                value: editingItem.data.category,
+                onChange: (ev) => setEditingItem(prev => ({ ...prev, data: { ...prev.data, category: ev.target.value } })),
+                className: "flex-1 p-1.5 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs font-bold outline-none"
+              },
+                e("option", { value: "Üretim" }, "⚙️ Üretim"),
+                e("option", { value: "Kalite" }, "🔍 Kalite"),
+                e("option", { value: "Yönetim" }, "📋 Yönetim"),
+                e("option", { value: "Genel" }, "📌 Genel")
+              )
+            ),
+
+            editingItem.type === "note" && e("input", {
+              type: "text",
+              placeholder: "Sorumlu Kişi",
+              value: editingItem.data.assignee,
+              onChange: (ev) => setEditingItem(prev => ({ ...prev, data: { ...prev.data, assignee: ev.target.value } })),
+              className: "w-full p-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs outline-none"
+            }),
+
+            e("div", { className: "flex justify-end gap-2 pt-1" },
+              e("button", { onClick: () => setEditingItem(null), className: "px-3 py-1.5 text-xs text-slate-500 font-bold" }, "İptal"),
+              e("button", { onClick: saveEditedItem, className: "px-4 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-black shadow-xs" }, "Güncelle")
+            )
+          )
+        ),
+
+        // Canlı Ses / Mikrofon Çalışma Paneli (Overlay Bar)
+        (isLiveListening || isRecordingAudio) && e("div", {
+          className: "fixed top-14 left-1/2 -translate-x-1/2 z-40 bg-rose-600 text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-3 animate-bounce"
+        },
+          e("span", { className: "w-2.5 h-2.5 bg-white rounded-full animate-ping" }),
+          e("span", { className: "text-xs font-bold" }, isLiveListening ? "Canlı Ses Dinleniyor..." : "Ses Kaydediliyor..."),
+          e("button", {
+            onClick: stopAllAudioControls,
+            className: "bg-black/30 hover:bg-black/50 px-2 py-0.5 rounded-full text-[10px] font-black border border-white/20"
+          }, "⏹️ Durdur & Tamamla")
+        ),
+
+        // Gizli Dosya Input'ları
         e("input", { 
           type: "file", 
           accept: "image/*", 
           ref: taskFileInputRef, 
           onChange: (ev) => {
             const file = ev.target.files && ev.target.files[0];
-            if (file) {
-              compressImage(file, 800, 0.7, (compressedBase64) => {
-                setSelectedTaskImage(compressedBase64);
-                setShowAddForm(true);
-              });
-            }
+            if (file) compressImage(file, 800, 0.7, (compressedBase64) => { setSelectedTaskImage(compressedBase64); setShowAddForm(true); });
           }, 
           className: "hidden" 
         }),
@@ -412,31 +659,61 @@
           ref: meetingFileInputRef, 
           onChange: (ev) => {
             const file = ev.target.files && ev.target.files[0];
-            if (file) {
-              compressImage(file, 800, 0.7, (compressedBase64) => {
-                setSelectedMeetingImage(compressedBase64);
-              });
-            }
+            if (file) compressImage(file, 800, 0.7, (compressedBase64) => setSelectedMeetingImage(compressedBase64));
           }, 
           className: "hidden" 
+        }),
+
+        e("input", {
+          type: "file",
+          accept: "image/*",
+          ref: bgFileInputRef,
+          onChange: (ev) => {
+            const file = ev.target.files && ev.target.files[0];
+            if (file) {
+              compressImage(file, 1200, 0.6, (base64) => {
+                setCustomBgUrl(base64);
+                localStorage.setItem("app_bg_custom", base64);
+                handleBgChange("custom");
+              });
+            }
+          },
+          className: "hidden"
         }),
 
         // Header
         e("header", { className: "p-3.5 flex items-center justify-between backdrop-blur-xl bg-white/90 dark:bg-slate-900/90 sticky top-0 z-30 border-b border-slate-200 dark:border-slate-800 shadow-xs" },
           e("div", { className: "flex items-center gap-2" },
-            e("div", { className: "w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-sm" }, "⚡"),
+            e("div", { className: "w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-sm shadow-md" }, "⚡"),
             e("div", null,
               e("h1", { className: "font-black text-xs tracking-tight text-slate-900 dark:text-white" }, "İş Asistanım PRO"),
               e("span", { className: "text-[9px] font-bold text-slate-400 block -mt-0.5" }, isSyncing ? "Eşitleniyor..." : "Bulut Aktif")
             )
           ),
-          e("button", { onClick: () => setDarkMode(!darkMode), className: "p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs" }, darkMode ? "☀️" : "🌙")
+          e("div", { className: "flex items-center gap-1.5" },
+            e("button", { onClick: () => setShowSettings(!showSettings), className: "p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs" }, "⚙️"),
+            e("button", { onClick: () => setDarkMode(!darkMode), className: "p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs" }, darkMode ? "☀️" : "🌙")
+          )
+        ),
+
+        // Ayarlar ve Arka Plan Teması Modalı
+        showSettings && e("div", { className: "p-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 space-y-2.5 animate-fadeIn" },
+          e("div", { className: "flex justify-between items-center" },
+            e("span", { className: "text-xs font-black" }, "🎨 Arka Plan Teması"),
+            e("button", { onClick: handleLogout, className: "text-[10px] font-bold text-rose-500 bg-rose-50 dark:bg-rose-950 px-2 py-1 rounded-lg" }, "🔒 Oturumu Kapat")
+          ),
+          e("div", { className: "grid grid-cols-4 gap-1.5 text-[10px] font-bold" },
+            e("button", { onClick: () => handleBgChange("default"), className: `p-2 rounded-xl border text-center ${bgPattern === "default" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : ""}` }, "Varsayılan"),
+            e("button", { onClick: () => handleBgChange("dots"), className: `p-2 rounded-xl border text-center ${bgPattern === "dots" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : ""}` }, "Noktalı"),
+            e("button", { onClick: () => handleBgChange("grid"), className: `p-2 rounded-xl border text-center ${bgPattern === "grid" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : ""}` }, "Izgara"),
+            e("button", { onClick: () => bgFileInputRef.current && bgFileInputRef.current.click(), className: `p-2 rounded-xl border text-center ${bgPattern === "custom" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : ""}` }, "🖼️ Görsel")
+          )
         ),
 
         e("main", { className: "p-3 space-y-3" },
           
           // Tab Switcher
-          e("div", { className: "flex bg-slate-200/80 dark:bg-slate-800/80 p-1 rounded-2xl gap-1 text-xs font-black" },
+          e("div", { className: "flex bg-slate-200/80 dark:bg-slate-800/80 p-1 rounded-2xl gap-1 text-xs font-black shadow-inner" },
             e("button", {
               onClick: () => { setActiveTab("daily"); setSelectedFolderId(null); setSelectedSessionId(null); },
               className: `flex-1 py-2 rounded-xl transition-all ${activeTab === "daily" ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs" : "text-slate-500"}`
@@ -480,12 +757,31 @@
               )
             ),
 
-            e("div", { className: "grid grid-cols-3 gap-1.5" },
-              e("button", { onClick: () => setShowAddForm(!showAddForm), className: "py-2.5 bg-blue-600 text-white rounded-xl font-extrabold text-xs" }, showAddForm ? "Kapat" : "➕ Görev"),
-              e("button", { onClick: toggleListeningTask, className: `py-2.5 border rounded-xl font-extrabold text-xs ${isListeningTask ? "bg-rose-500 text-white animate-pulse" : "bg-white dark:bg-slate-900"}` }, "🎙️ Sesle"),
-              e("button", { onClick: () => taskFileInputRef.current && taskFileInputRef.current.click(), className: "py-2.5 bg-white dark:bg-slate-900 border rounded-xl font-extrabold text-xs" }, "📷 Resim")
+            // Görev Ekleme Kontrol Butonları
+            e("div", { className: "grid grid-cols-3 gap-1.5 relative" },
+              e("button", { onClick: () => setShowAddForm(!showAddForm), className: "py-2.5 bg-blue-600 text-white rounded-xl font-extrabold text-xs shadow-xs" }, showAddForm ? "Kapat" : "➕ Görev"),
+              
+              e("button", { 
+                onClick: () => setShowAudioMenu(showAudioMenu === "task" ? null : "task"), 
+                className: "py-2.5 bg-white dark:bg-slate-900 border rounded-xl font-extrabold text-xs shadow-xs flex items-center justify-center gap-1" 
+              }, "🎙️ Sesle ▾"),
+              
+              e("button", { onClick: () => taskFileInputRef.current && taskFileInputRef.current.click(), className: "py-2.5 bg-white dark:bg-slate-900 border rounded-xl font-extrabold text-xs shadow-xs" }, "📷 Resim"),
+
+              // Ses Seçenekleri Açılır Menü (Task)
+              showAudioMenu === "task" && e("div", { className: "absolute top-12 left-1/3 z-30 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-1.5 space-y-1 animate-fadeIn" },
+                e("button", {
+                  onClick: () => { setShowAudioMenu(null); startLiveListening("task"); },
+                  className: "w-full text-left p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-xs font-bold flex items-center gap-2"
+                }, "🗣️ Canlı Yazıya Dök"),
+                e("button", {
+                  onClick: () => { setShowAudioMenu(null); startAudioRecording("task"); },
+                  className: "w-full text-left p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-xs font-bold flex items-center gap-2"
+                }, "🎙️ Ses Kaydı Olarak Ekle")
+              )
             ),
 
+            // Form
             showAddForm && e("div", { className: "p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2.5 shadow-xs" },
               e("input", { 
                 type: "text", 
@@ -495,7 +791,6 @@
                 className: "w-full p-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs outline-none" 
               }),
               
-              // Yan yana Öncelik ve Tür Seçimi
               e("div", { className: "flex gap-2" },
                 e("div", { className: "flex-1 space-y-1" },
                   e("label", { className: "text-[10px] font-black text-slate-400 block" }, "Öncelik"),
@@ -529,14 +824,20 @@
                 e("button", { onClick: () => setSelectedTaskImage(null), className: "absolute -top-1.5 -right-1.5 bg-rose-500 text-white w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shadow" }, "✕")
               ),
 
-              e("button", { onClick: () => addTask(), className: "w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-bold" }, "Kaydet")
+              taskAudioBlob && e("div", { className: "flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-2 rounded-xl" },
+                e("audio", { src: taskAudioBlob, controls: true, className: "h-8 w-full" }),
+                e("button", { onClick: () => setTaskAudioBlob(null), className: "text-rose-500 font-bold text-xs" }, "✕")
+              ),
+
+              e("button", { onClick: addTask, className: "w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-bold shadow-xs" }, "Kaydet")
             ),
 
+            // Görev Listesi
             filteredTasks.map(task => e("div", { 
               key: task.id, 
-              className: "p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col gap-2" 
+              className: "p-2.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col gap-2 shadow-xs" 
             },
-              e("div", { className: "flex items-center justify-between gap-2" },
+              e("div", { className: "flex items-start justify-between gap-2" },
                 e("div", { className: "flex items-start gap-2 flex-1" },
                   e("button", {
                     onClick: () => toggleTask(task.id),
@@ -550,10 +851,14 @@
                     )
                   )
                 ),
-                e("button", { onClick: () => deleteTaskFromFirebase(task.id), className: "text-slate-400 text-xs px-1" }, "🗑️")
+                e("div", { className: "flex items-center gap-1" },
+                  e("button", { onClick: () => setEditingItem({ type: 'task', data: task }), className: "text-slate-400 hover:text-blue-600 text-xs px-1" }, "✏️"),
+                  e("button", { onClick: () => deleteTaskFromFirebase(task.id), className: "text-slate-400 hover:text-rose-600 text-xs px-1" }, "🗑️")
+                )
               ),
-              
-              // Uygulama içi Resim Açıcı Tıklama Olayı
+
+              task.audio && e("audio", { src: task.audio, controls: true, className: "h-8 w-full my-1" }),
+
               task.image && e("div", { 
                 onClick: () => setPreviewImageUrl(task.image), 
                 className: "cursor-pointer inline-block ml-6" 
@@ -567,10 +872,10 @@
           activeTab === "meetings" && e("div", { className: "space-y-3" },
 
             !selectedFolderId && e("div", { className: "space-y-3" },
-              e("div", { className: "p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex gap-2" },
+              e("div", { className: "p-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-2xl border border-slate-200 dark:border-slate-800 flex gap-2 shadow-xs" },
                 e("input", {
                   type: "text",
-                  placeholder: "Ana Toplantı Başlığı (Örn: Ass Takip...)",
+                  placeholder: "Ana Toplantı Başlığı...",
                   value: newMeetingTitle,
                   onChange: (ev) => setNewMeetingTitle(ev.target.value),
                   className: "flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs outline-none"
@@ -582,7 +887,7 @@
                 meetingTopics.map(folder => e("div", {
                   key: folder.id,
                   onClick: () => { setSelectedFolderId(folder.id); setSelectedSessionId(null); },
-                  className: "p-3.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between cursor-pointer hover:border-blue-500 transition-all"
+                  className: "p-3.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between cursor-pointer hover:border-blue-500 transition-all shadow-xs"
                 },
                   e("div", { className: "flex items-center gap-2.5" },
                     e("span", { className: "text-lg" }, "📁"),
@@ -605,7 +910,7 @@
                 e("span", { className: "text-xs font-black bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-300 px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800" }, activeFolderObj?.title)
               ),
 
-              e("div", { className: "p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2" },
+              e("div", { className: "p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2 shadow-xs" },
                 e("span", { className: "text-[11px] font-black text-slate-700 dark:text-slate-300 block" }, "➕ Yeni Tarihli Toplantı Klasörü Aç"),
                 e("div", { className: "flex gap-2" },
                   e("input", {
@@ -624,7 +929,7 @@
               e("div", { className: "space-y-2" },
                 (activeFolderObj?.sessions || []).map(session => e("div", {
                   key: session.id,
-                  className: "p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between"
+                  className: "p-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-xs"
                 },
                   e("div", {
                     onClick: () => setSelectedSessionId(session.id),
@@ -659,7 +964,7 @@
                 e("span", { className: "text-xs font-black bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800" }, `${activeSessionObj?.title} (${activeSessionObj?.date})`)
               ),
 
-              e("div", { className: "p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2" },
+              e("div", { className: "p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2 shadow-xs relative" },
                 e("textarea", {
                   rows: "2",
                   placeholder: "Toplantı notu veya alınan karar...",
@@ -668,27 +973,46 @@
                   className: "w-full p-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs outline-none"
                 }),
 
-                e("div", { className: "flex gap-2" },
+                e("div", { className: "flex gap-2 relative" },
                   e("input", {
                     type: "text",
-                    placeholder: "Sorumlu (Örn: Mehmet)",
+                    placeholder: "Sorumlu Kişi",
                     value: newNoteAssignee,
                     onChange: (ev) => setNewNoteAssignee(ev.target.value),
                     className: "flex-1 p-1.5 bg-slate-50 dark:bg-slate-800 border rounded-lg text-xs outline-none"
                   }),
+                  
                   e("button", {
-                    onClick: toggleListeningNote,
-                    className: `px-2.5 py-1.5 rounded-lg border text-[10px] font-bold ${isListeningNote ? "bg-rose-500 text-white animate-pulse" : "bg-slate-100 dark:bg-slate-800"}`
-                  }, "🎙️ Ses"),
+                    onClick: () => setShowAudioMenu(showAudioMenu === "note" ? null : "note"),
+                    className: "px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 border rounded-lg text-[10px] font-bold flex items-center gap-1"
+                  }, "🎙️ Ses ▾"),
+
                   e("button", {
                     onClick: () => meetingFileInputRef.current && meetingFileInputRef.current.click(),
                     className: "px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 border rounded-lg text-[10px] font-bold"
-                  }, "📷 Resim")
+                  }, "📷 Resim"),
+
+                  // Ses Seçenekleri Açılır Menü (Note)
+                  showAudioMenu === "note" && e("div", { className: "absolute bottom-10 right-10 z-30 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-1.5 space-y-1 animate-fadeIn" },
+                    e("button", {
+                      onClick: () => { setShowAudioMenu(null); startLiveListening("note"); },
+                      className: "w-full text-left p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-xs font-bold flex items-center gap-2"
+                    }, "🗣️ Canlı Yazıya Dök"),
+                    e("button", {
+                      onClick: () => { setShowAudioMenu(null); startAudioRecording("note"); },
+                      className: "w-full text-left p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-xs font-bold flex items-center gap-2"
+                    }, "🎙️ Ses Kaydı Olarak Ekle")
+                  )
                 ),
 
                 selectedMeetingImage && e("div", { className: "relative w-12 h-12" },
                   e("img", { src: selectedMeetingImage, className: "w-full h-full object-cover rounded-lg border" }),
                   e("button", { onClick: () => setSelectedMeetingImage(null), className: "absolute -top-1 -right-1 bg-rose-500 text-white w-4 h-4 rounded-full text-[8px]" }, "✕")
+                ),
+
+                meetingAudioBlob && e("div", { className: "flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-2 rounded-xl" },
+                  e("audio", { src: meetingAudioBlob, controls: true, className: "h-8 w-full" }),
+                  e("button", { onClick: () => setMeetingAudioBlob(null), className: "text-rose-500 font-bold text-xs" }, "✕")
                 ),
 
                 e("button", {
@@ -700,24 +1024,28 @@
               e("div", { className: "space-y-1.5" },
                 (activeSessionObj?.notes || []).map((note, idx) => e("div", {
                   key: note.id,
-                  className: "p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1 shadow-2xs"
+                  className: "p-2.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-xl border border-slate-200 dark:border-slate-800 space-y-1 shadow-2xs"
                 },
                   e("div", { className: "flex items-center justify-between" },
                     e("div", { className: "flex items-center gap-1.5" },
                       e("span", { className: "text-[10px] font-black text-slate-400" }, `#${idx + 1}`),
                       e("span", { className: "text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950 px-1.5 py-0.5 rounded" }, `👤 ${note.assignee}`)
                     ),
-                    e("button", {
-                      onClick: () => {
-                        addTask(`[${activeFolderObj.title} - ${activeSessionObj.title}] ${note.content}`);
-                        alert("Görevlere aktarıldı!");
-                      },
-                      className: "text-[10px] font-bold text-blue-600 hover:underline"
-                    }, "➡️ Görev Yap")
+                    e("div", { className: "flex items-center gap-2" },
+                      e("button", { onClick: () => setEditingItem({ type: 'note', data: note }), className: "text-slate-400 hover:text-blue-600 text-xs" }, "✏️"),
+                      e("button", {
+                        onClick: () => {
+                          addTask(`[${activeFolderObj.title} - ${activeSessionObj.title}] ${note.content}`);
+                          alert("Görevlere aktarıldı!");
+                        },
+                        className: "text-[10px] font-bold text-blue-600 hover:underline"
+                      }, "➡️ Görev Yap")
+                    )
                   ),
                   e("p", { className: "text-xs font-semibold text-slate-800 dark:text-slate-100 leading-snug" }, note.content),
                   
-                  // Toplantı Notundaki Resim İçin Uygulama İçi Resim Açıcı
+                  note.audio && e("audio", { src: note.audio, controls: true, className: "h-8 w-full my-1" }),
+
                   note.image && e("div", { 
                     onClick: () => setPreviewImageUrl(note.image), 
                     className: "cursor-pointer inline-block mt-1" 
