@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>İş Asistanım PRO</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>İş Asistanım PRO - Kurumsal</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -42,7 +41,7 @@
     window.dbFuncs = { collection, onSnapshot, doc, setDoc, deleteDoc };
   </script>
 </head>
-<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans antialiased min-h-screen">
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans antialiased min-h-screen select-none overflow-x-hidden">
   <div id="root"></div>
 
   <script>
@@ -78,6 +77,35 @@
       };
     };
 
+    // Web Audio API ile Alarm Bip Sesi Üretici
+    const playAlarmSound = () => {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        
+        const playBeep = (freq, duration, delay) => {
+          setTimeout(() => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "sine";
+            osc.frequency.value = freq;
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + duration);
+            osc.stop(ctx.currentTime + duration);
+          }, delay);
+        };
+
+        playBeep(880, 0.2, 0);
+        playBeep(880, 0.2, 250);
+        playBeep(1200, 0.4, 500);
+      } catch(err) {
+        console.log("Ses çalma hatası:", err);
+      }
+    };
+
     function App() {
       const todayISO = new Date().toISOString().split("T")[0];
 
@@ -85,32 +113,43 @@
       const [isAuthenticated, setIsAuthenticated] = useState(() => {
         return localStorage.getItem("app_authenticated") === "true";
       });
-      const [userPin, setUserPin] = useState(() => localStorage.getItem("app_pin") || "");
       const [inputPin, setInputPin] = useState("");
-      const [inputCred, setInputCred] = useState("");
 
-      // Tema ve Arka Plan (2. TEMA KALICILIĞI)
-      const [darkMode, setDarkMode] = useState(() => {
-        return localStorage.getItem("app_dark_mode") === "true";
+      // Profil / Kişisel Bilgiler (WhatsApp "Siz" Ekranı)
+      const [profile, setProfile] = useState(() => {
+        const saved = localStorage.getItem("user_profile");
+        return saved ? JSON.parse(saved) : {
+          fullName: "Yönetici Kullanıcı",
+          email: "admin@sirket.com",
+          phone: "+90 555 000 0000",
+          avatar: null
+        };
       });
+
+      // Tema ve Arka Plan
+      const [darkMode, setDarkMode] = useState(() => localStorage.getItem("app_dark_mode") === "true");
       const [bgPattern, setBgPattern] = useState(() => localStorage.getItem("app_bg") || "default");
       const [customBgUrl, setCustomBgUrl] = useState(() => localStorage.getItem("app_bg_custom") || "");
-      const [showSettings, setShowSettings] = useState(false);
 
-      // Navigasyon
+      // Navigasyon (Tabs: 'daily' | 'meetings' | 'profile')
       const [activeTab, setActiveTab] = useState("daily");
       const [selectedDate, setSelectedDate] = useState(todayISO);
       const [selectedFolderId, setSelectedFolderId] = useState(null);
       const [selectedSessionId, setSelectedSessionId] = useState(null);
 
+      // Swipe (Dokunmatik Kaydırma)
+      const touchStartX = useRef(0);
+      const touchEndX = useRef(0);
+
       // Modallar
       const [previewImageUrl, setPreviewImageUrl] = useState(null);
-      const [editingItem, setEditingItem] = useState(null); // { type: 'task' | 'note', data: ... }
+      const [editingItem, setEditingItem] = useState(null);
 
       // Medya ve Refler
       const taskFileInputRef = useRef(null);
       const meetingFileInputRef = useRef(null);
       const bgFileInputRef = useRef(null);
+      const avatarFileInputRef = useRef(null);
 
       const [selectedTaskImage, setSelectedTaskImage] = useState(null);
       const [selectedMeetingImage, setSelectedMeetingImage] = useState(null);
@@ -119,10 +158,9 @@
       const [meetingAudioBlob, setMeetingAudioBlob] = useState(null);
 
       // Sesli Mod Kontrolleri
-      const [speechTarget, setSpeechTarget] = useState(null); // 'task' | 'note'
-      const [showAudioMenu, setShowAudioMenu] = useState(null); // 'task' | 'note'
+      const [speechTarget, setSpeechTarget] = useState(null);
+      const [showAudioMenu, setShowAudioMenu] = useState(null);
       const [isLiveListening, setIsLiveListening] = useState(false);
-      const [liveTranscript, setLiveTranscript] = useState("");
       const [isRecordingAudio, setIsRecordingAudio] = useState(false);
 
       const recognitionRef = useRef(null);
@@ -140,6 +178,7 @@
       const [newTaskCategory, setNewTaskCategory] = useState("Üretim");
       const [newTaskBgColor, setNewTaskBgColor] = useState("#ffffff");
       const [newTaskAlarm, setNewTaskAlarm] = useState("");
+      const [newTaskAlarmType, setNewTaskAlarmType] = useState("both"); // 'sound' | 'vibrate' | 'both'
 
       const [newMeetingTitle, setNewMeetingTitle] = useState("");
       const [newSessionDate, setNewSessionDate] = useState(todayISO);
@@ -165,40 +204,58 @@
 
       const dateList = generateDateList();
 
-      // Tema Değişimi ve Kalıcılık Saklama
+      // Profil Kaydetme
+      const saveProfile = (newProf) => {
+        setProfile(newProf);
+        localStorage.setItem("user_profile", JSON.stringify(newProf));
+      };
+
+      // Tema Değişimi ve Kalıcılık
       useEffect(() => {
         if (darkMode) document.documentElement.classList.add('dark');
         else document.documentElement.classList.remove('dark');
         localStorage.setItem("app_dark_mode", darkMode.toString());
       }, [darkMode]);
 
-      // Bildirim İzni İsteme (5. ALARM SİSTEMİ)
+      // Bildirim İzni İsteme
       useEffect(() => {
         if ("Notification" in window && Notification.permission !== "granted") {
           Notification.requestPermission();
         }
       }, []);
 
-      // Alarm Zamanlayıcı Kontrolcüsü
+      // Alarm ve Titreşim Kontrolcüsü
       useEffect(() => {
         const interval = setInterval(() => {
           const nowStr = new Date().toISOString().slice(0, 16);
           tasks.forEach(task => {
             if (task.alarmTime && task.alarmTime === nowStr && !task.completed && !task.alarmNotified) {
+              
+              // Sesli ve Titreşimli Bip
+              const type = task.alarmType || "both";
+              if (type === "sound" || type === "both") {
+                playAlarmSound();
+              }
+              if ((type === "vibrate" || type === "both") && "vibrate" in navigator) {
+                navigator.vibrate([300, 100, 300, 100, 500]);
+              }
+
+              // Tarayıcı/Mobil Bildirimi
               if ("Notification" in window && Notification.permission === "granted") {
                 new Notification("İş Asistanım PRO ⏰", {
                   body: `Hatırlatma: ${task.title}`,
-                  icon: "⚡"
+                  icon: profile.avatar || "⚡"
                 });
               } else {
                 alert(`⏰ ALARM: ${task.title}`);
               }
+
               saveTaskToFirebase({ ...task, alarmNotified: true });
             }
           });
-        }, 30000); // 30 saniyede bir kontrol et
+        }, 15000); // 15 saniyede bir hassas kontrol
         return () => clearInterval(interval);
-      }, [tasks]);
+      }, [tasks, profile]);
 
       // Firebase Senkronizasyonu
       useEffect(() => {
@@ -234,13 +291,32 @@
         return () => clearInterval(checkDb);
       }, []);
 
-      // Güvenlik Doğrulama
+      // Touch Swipe (Sola/Sağa Kaydırma) Mantığı
+      const handleTouchStart = (e) => {
+        touchStartX.current = e.touches[0].clientX;
+      };
+
+      const handleTouchEnd = (e) => {
+        touchEndX.current = e.changedTouches[0].clientX;
+        const diff = touchStartX.current - touchEndX.current;
+
+        if (Math.abs(diff) > 70) { // En az 70px kaydırma
+          if (diff > 0) { // Sola Kaydırma ➔ İleri Sekme
+            if (activeTab === "daily") setActiveTab("meetings");
+            else if (activeTab === "meetings") setActiveTab("profile");
+          } else { // Sağa Kaydırma ➔ Geri Sekme
+            if (activeTab === "profile") setActiveTab("meetings");
+            else if (activeTab === "meetings") setActiveTab("daily");
+          }
+        }
+      };
+
+      // Oturum İşlemleri
       const handleAuthSubmit = () => {
         const storedPin = localStorage.getItem("app_pin");
         if (!storedPin) {
-          if (!inputPin.trim()) return alert("Lütfen bir PIN/Şifre belirleyin.");
+          if (!inputPin.trim()) return alert("Lütfen bir PIN belirleyin.");
           localStorage.setItem("app_pin", inputPin);
-          localStorage.setItem("app_cred", inputCred);
           localStorage.setItem("app_authenticated", "true");
           setIsAuthenticated(true);
         } else {
@@ -248,7 +324,7 @@
             localStorage.setItem("app_authenticated", "true");
             setIsAuthenticated(true);
           } else {
-            alert("Hatalı Şifre/PIN!");
+            alert("Hatalı PIN!");
           }
         }
       };
@@ -264,7 +340,7 @@
         localStorage.setItem("app_bg", type);
       };
 
-      // CANLI SES TANIMA (Transkript)
+      // Canlı Ses Tanıma
       const startLiveListening = (target) => {
         if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
           return alert("Tarayıcınız ses tanıma özelliğini desteklemiyor.");
@@ -273,7 +349,6 @@
         stopAllAudioControls();
         setSpeechTarget(target);
         setIsLiveListening(true);
-        setLiveTranscript("");
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
@@ -286,8 +361,6 @@
           for (let i = event.resultIndex; i < event.results.length; ++i) {
             currentText += event.results[i][0].transcript;
           }
-          setLiveTranscript(currentText);
-
           if (target === "task") {
             setNewTaskTitle(currentText);
             setShowAddForm(true);
@@ -303,7 +376,7 @@
         recognition.start();
       };
 
-      // 1. SES KAYDI (Audio File - MIME FIX ENTEGRASYONU)
+      // Ses Kaydı (WebM Fix)
       const startAudioRecording = (target) => {
         stopAllAudioControls();
         setSpeechTarget(target);
@@ -342,7 +415,6 @@
         }).catch(err => alert("Mikrofon izni alınamadı: " + err));
       };
 
-      // Mikrofonu Tam Kapatma Fonksiyonu
       const stopAllAudioControls = () => {
         if (recognitionRef.current) {
           recognitionRef.current.stop();
@@ -376,20 +448,29 @@
         await setDoc(doc(window.db, "topics", topicObj.id), topicObj);
       };
 
+      // Görev Ekleme (Oluşturulma Tarihi Eklendi)
       const addTask = () => {
         if (!newTaskTitle.trim() && !selectedTaskImage && !taskAudioBlob) return;
+        
+        const now = new Date();
+        const formattedCreatedDate = `${now.toLocaleDateString('tr-TR')} ${now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+
         const newTask = {
           id: Date.now().toString(),
           title: newTaskTitle || "Sesli Görev / Görsel",
           date: selectedDate,
+          createdDate: formattedCreatedDate, // Notun eklendiği tarih-saat
           completed: false,
           priority: newTaskPriority || "Yüksek",
           category: newTaskCategory || "Üretim",
           bgColor: newTaskBgColor || "#ffffff",
           alarmTime: newTaskAlarm || "",
+          alarmType: newTaskAlarmType || "both",
           alarmNotified: false,
           image: selectedTaskImage,
           audio: taskAudioBlob,
+          createdBy: profile.fullName,
+          assignedTo: profile.fullName,
           isRollover: false
         };
         saveTaskToFirebase(newTask);
@@ -411,6 +492,7 @@
         const newFolder = {
           id: "folder_" + Date.now(),
           title: newMeetingTitle,
+          createdBy: profile.fullName,
           sessions: []
         };
         saveTopicToFirebase(newFolder);
@@ -442,6 +524,9 @@
         const folder = meetingTopics.find(f => f.id === folderId);
         if (!folder) return;
 
+        const now = new Date();
+        const formattedDate = `${now.toLocaleDateString('tr-TR')} ${now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+
         const updatedSessions = (folder.sessions || []).map(sess => {
           if (sess.id === sessionId) {
             return {
@@ -449,10 +534,11 @@
               notes: [{
                 id: "n_" + Date.now(),
                 content: newNoteContent || "Ses Kaydı / Not",
-                assignee: newNoteAssignee || "Atanmadı",
+                assignee: newNoteAssignee || profile.fullName,
+                createdBy: profile.fullName,
                 image: selectedMeetingImage,
                 audio: meetingAudioBlob,
-                date: todayISO
+                date: formattedDate
               }, ...(sess.notes || [])]
             };
           }
@@ -538,7 +624,12 @@
 
       const activeFolderObj = meetingTopics.find(f => f.id === selectedFolderId);
       const activeSessionObj = activeFolderObj?.sessions?.find(s => s.id === selectedSessionId);
-      const filteredTasks = tasks.filter(t => t.date === selectedDate);
+
+      // Görev Sıralama Mantığı: Yüksek ➔ Orta ➔ Düşük
+      const priorityOrder = { "Yüksek": 1, "Orta": 2, "Düşük": 3 };
+      const sortedTasks = tasks
+        .filter(t => t.date === selectedDate)
+        .sort((a, b) => (priorityOrder[a.priority] || 99) - (priorityOrder[b.priority] || 99));
 
       const getPriorityBadgeClass = (priority) => {
         switch (priority) {
@@ -549,7 +640,6 @@
         }
       };
 
-      // Arka Plan Stil Oluşturma
       const getBgStyle = () => {
         if (bgPattern === "custom" && customBgUrl) {
           return { backgroundImage: `url(${customBgUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' };
@@ -560,10 +650,15 @@
         if (bgPattern === "grid") {
           return { backgroundImage: 'linear-gradient(to right, #e2e8f0 1px, transparent 1px), linear-gradient(to bottom, #e2e8f0 1px, transparent 1px)', backgroundSize: '20px 20px' };
         }
+        if (bgPattern === "whatsapp_dark") {
+          return { backgroundColor: '#0b141a', backgroundImage: 'radial-gradient(circle, #1f2c34 1px, transparent 1px)', backgroundSize: '18px 18px' };
+        }
+        if (bgPattern === "whatsapp_light") {
+          return { backgroundColor: '#efeae2', backgroundImage: 'radial-gradient(circle, #d1c7bd 1px, transparent 1px)', backgroundSize: '18px 18px' };
+        }
         return {};
       };
 
-      // 4. SOFT RENK PALETİ LİSTESİ
       const softColors = [
         { name: "Varsayılan", code: "#ffffff" },
         { name: "Soft Pembe", code: "#ffe5ec" },
@@ -575,24 +670,15 @@
 
       /* ---------------- GİRİŞ / KİLİT EKRANI ---------------- */
       if (!isAuthenticated) {
-        const isFirstSetup = !localStorage.getItem("app_pin");
         return e("div", { className: "min-h-screen flex items-center justify-center p-4 bg-slate-900 text-white" },
           e("div", { className: "w-full max-w-sm bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-2xl space-y-4 text-center" },
-            e("div", { className: "w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto text-xl font-black shadow-lg" }, "🔒"),
-            e("h2", { className: "text-lg font-black" }, isFirstSetup ? "Güvenlik Kurulumu" : "Giriş Yapın"),
-            e("p", { className: "text-xs text-slate-400" }, isFirstSetup ? "Uygulama için bir e-posta/tel ve PIN belirleyin." : "Devam etmek için PIN kodunuzu girin."),
+            e("div", { className: "w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto text-2xl font-black shadow-lg" }, "⚡"),
+            e("h2", { className: "text-lg font-black" }, "İş Asistanım PRO"),
+            e("p", { className: "text-xs text-slate-400" }, "Devam etmek için güvenlik PIN kodunuzu girin."),
             
-            isFirstSetup && e("input", {
-              type: "text",
-              placeholder: "E-posta veya Tel No",
-              value: inputCred,
-              onChange: (ev) => setInputCred(ev.target.value),
-              className: "w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-xs text-center outline-none"
-            }),
-
             e("input", {
               type: "password",
-              placeholder: "4 Haneli PIN / Şifre",
+              placeholder: "4 Haneli PIN",
               value: inputPin,
               onChange: (ev) => setInputPin(ev.target.value),
               className: "w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-sm font-bold text-center tracking-widest outline-none"
@@ -601,7 +687,7 @@
             e("button", {
               onClick: handleAuthSubmit,
               className: "w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-black text-xs transition-all shadow-lg"
-            }, isFirstSetup ? "Kaydet ve Başla" : "Giriş Yap")
+            }, "Giriş Yap")
           )
         );
       }
@@ -609,10 +695,12 @@
       /* ---------------- ANA UYGULAMA ARAYÜZÜ ---------------- */
       return e("div", { 
         style: getBgStyle(),
-        className: "max-w-md mx-auto min-h-screen flex flex-col pb-12 relative transition-all" 
+        onTouchStart: handleTouchStart,
+        onTouchEnd: handleTouchEnd,
+        className: "max-w-md mx-auto min-h-screen flex flex-col pb-20 relative transition-all" 
       },
         
-        // 3. İLK YÜKLEME EKRANI (LOADING OVERLAY)
+        // Yükleme Ekranı
         isSyncing && e("div", {
           className: "fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center"
         },
@@ -636,7 +724,7 @@
           )
         ),
 
-        // Modal: Düzenleme (Görev & Not)
+        // Modal: Düzenleme
         editingItem && e("div", {
           className: "fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs"
         },
@@ -677,38 +765,8 @@
                   e("option", { value: "Yönetim" }, "📋 Yönetim"),
                   e("option", { value: "Genel" }, "📌 Genel")
                 )
-              ),
-
-              // Soft Renk Değişimi Modalda
-              e("div", { className: "flex items-center gap-1.5" },
-                e("span", { className: "text-[10px] font-bold text-slate-400" }, "Renk:"),
-                softColors.map(c => e("button", {
-                  key: c.code,
-                  onClick: () => setEditingItem(prev => ({ ...prev, data: { ...prev.data, bgColor: c.code } })),
-                  style: { backgroundColor: c.code },
-                  className: `w-5 h-5 rounded-full border border-slate-300 dark:border-slate-700 ${editingItem.data.bgColor === c.code ? "ring-2 ring-blue-600" : ""}`
-                }))
-              ),
-
-              // Alarm Kurma Modalda
-              e("div", { className: "flex items-center gap-2" },
-                e("span", { className: "text-[10px] font-bold text-slate-400" }, "⏰ Alarm:"),
-                e("input", {
-                  type: "datetime-local",
-                  value: editingItem.data.alarmTime || "",
-                  onChange: (ev) => setEditingItem(prev => ({ ...prev, data: { ...prev.data, alarmTime: ev.target.value } })),
-                  className: "p-1 bg-slate-50 dark:bg-slate-800 border rounded-lg text-xs font-bold outline-none"
-                })
               )
             ),
-
-            editingItem.type === "note" && e("input", {
-              type: "text",
-              placeholder: "Sorumlu Kişi",
-              value: editingItem.data.assignee,
-              onChange: (ev) => setEditingItem(prev => ({ ...prev, data: { ...prev.data, assignee: ev.target.value } })),
-              className: "w-full p-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs outline-none"
-            }),
 
             e("div", { className: "flex justify-end gap-2 pt-1" },
               e("button", { onClick: () => setEditingItem(null), className: "px-3 py-1.5 text-xs text-slate-500 font-bold" }, "İptal"),
@@ -717,7 +775,7 @@
           )
         ),
 
-        // Canlı Ses / Mikrofon Çalışma Paneli (Overlay Bar)
+        // Ses Kaydı Çalışma Overlay Bar
         (isLiveListening || isRecordingAudio) && e("div", {
           className: "fixed top-14 left-1/2 -translate-x-1/2 z-40 bg-rose-600 text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-3 animate-bounce"
         },
@@ -729,7 +787,7 @@
           }, "⏹️ Durdur & Tamamla")
         ),
 
-        // Gizli Dosya Input'ları
+        // Gizli Input'lar
         e("input", { 
           type: "file", 
           accept: "image/*", 
@@ -769,52 +827,39 @@
           className: "hidden"
         }),
 
+        e("input", {
+          type: "file",
+          accept: "image/*",
+          ref: avatarFileInputRef,
+          onChange: (ev) => {
+            const file = ev.target.files && ev.target.files[0];
+            if (file) {
+              compressImage(file, 300, 0.8, (base64Avatar) => {
+                saveProfile({ ...profile, avatar: base64Avatar });
+              });
+            }
+          },
+          className: "hidden"
+        }),
+
         // Header
         e("header", { className: "p-3.5 flex items-center justify-between backdrop-blur-xl bg-white/90 dark:bg-slate-900/90 sticky top-0 z-30 border-b border-slate-200 dark:border-slate-800 shadow-xs" },
           e("div", { className: "flex items-center gap-2" },
             e("div", { className: "w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-sm shadow-md" }, "⚡"),
             e("div", null,
               e("h1", { className: "font-black text-xs tracking-tight text-slate-900 dark:text-white" }, "İş Asistanım PRO"),
-              e("span", { className: "text-[9px] font-bold text-slate-400 block -mt-0.5" }, isSyncing ? "Eşitleniyor..." : "Bulut Aktif")
+              e("span", { className: "text-[9px] font-bold text-slate-400 block -mt-0.5" }, isSyncing ? "Eşitleniyor..." : "Kurumsal Bulut Active")
             )
           ),
-          e("div", { className: "flex items-center gap-1.5" },
-            e("button", { onClick: () => setShowSettings(!showSettings), className: "p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs" }, "⚙️"),
-            e("button", { onClick: () => setDarkMode(!darkMode), className: "p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs" }, darkMode ? "☀️" : "🌙")
-          )
-        ),
-
-        // Ayarlar ve Arka Plan Teması Modalı
-        showSettings && e("div", { className: "p-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 space-y-2.5 animate-fadeIn" },
-          e("div", { className: "flex justify-between items-center" },
-            e("span", { className: "text-xs font-black" }, "🎨 Arka Plan Teması"),
-            e("button", { onClick: handleLogout, className: "text-[10px] font-bold text-rose-500 bg-rose-50 dark:bg-rose-950 px-2 py-1 rounded-lg" }, "🔒 Oturumu Kapat")
-          ),
-          e("div", { className: "grid grid-cols-4 gap-1.5 text-[10px] font-bold" },
-            e("button", { onClick: () => handleBgChange("default"), className: `p-2 rounded-xl border text-center ${bgPattern === "default" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : ""}` }, "Varsayılan"),
-            e("button", { onClick: () => handleBgChange("dots"), className: `p-2 rounded-xl border text-center ${bgPattern === "dots" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : ""}` }, "Noktalı"),
-            e("button", { onClick: () => handleBgChange("grid"), className: `p-2 rounded-xl border text-center ${bgPattern === "grid" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : ""}` }, "Izgara"),
-            e("button", { onClick: () => bgFileInputRef.current && bgFileInputRef.current.click(), className: `p-2 rounded-xl border text-center ${bgPattern === "custom" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : ""}` }, "🖼️ Görsel")
-          )
+          e("button", { onClick: () => setDarkMode(!darkMode), className: "p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs" }, darkMode ? "☀️" : "🌙")
         ),
 
         e("main", { className: "p-3 space-y-3" },
-          
-          // Tab Switcher
-          e("div", { className: "flex bg-slate-200/80 dark:bg-slate-800/80 p-1 rounded-2xl gap-1 text-xs font-black shadow-inner" },
-            e("button", {
-              onClick: () => { setActiveTab("daily"); setSelectedFolderId(null); setSelectedSessionId(null); },
-              className: `flex-1 py-2 rounded-xl transition-all ${activeTab === "daily" ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs" : "text-slate-500"}`
-            }, "☑️ Günlük Görevler"),
-            e("button", {
-              onClick: () => { setActiveTab("meetings"); setSelectedFolderId(null); setSelectedSessionId(null); },
-              className: `flex-1 py-2 rounded-xl transition-all ${activeTab === "meetings" ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs" : "text-slate-500"}`
-            }, "📁 Toplantı Konuları")
-          ),
 
-          /* ---------------- 1. GÜNLÜK GÖREVLER ---------------- */
+          /* ---------------- 1. GÜNLÜK GÖREVLER EKRANI ---------------- */
           activeTab === "daily" && e("div", { className: "space-y-3" },
             
+            // Tarih Seçimi (Aynen Korundu)
             e("div", { className: "bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-3 rounded-2xl shadow-md space-y-2" },
               e("div", { className: "flex items-center justify-between text-xs font-black" },
                 e("span", { className: "opacity-90" }, "📅 Tarih Seçimi"),
@@ -845,18 +890,17 @@
               )
             ),
 
-            // Görev Ekleme Kontrol Butonları
+            // Görev Ekleme Kontrol Butonları (Sesli Not ve Fotoğraflı Not Olarak Güncellendi)
             e("div", { className: "grid grid-cols-3 gap-1.5 relative" },
               e("button", { onClick: () => setShowAddForm(!showAddForm), className: "py-2.5 bg-blue-600 text-white rounded-xl font-extrabold text-xs shadow-xs" }, showAddForm ? "Kapat" : "➕ Görev"),
               
               e("button", { 
                 onClick: () => setShowAudioMenu(showAudioMenu === "task" ? null : "task"), 
                 className: "py-2.5 bg-white dark:bg-slate-900 border rounded-xl font-extrabold text-xs shadow-xs flex items-center justify-center gap-1" 
-              }, "🎙️ Sesle ▾"),
+              }, "🎙️ Sesli Not ▾"),
               
-              e("button", { onClick: () => taskFileInputRef.current && taskFileInputRef.current.click(), className: "py-2.5 bg-white dark:bg-slate-900 border rounded-xl font-extrabold text-xs shadow-xs" }, "📷 Resim"),
+              e("button", { onClick: () => taskFileInputRef.current && taskFileInputRef.current.click(), className: "py-2.5 bg-white dark:bg-slate-900 border rounded-xl font-extrabold text-xs shadow-xs" }, "📷 Fotoğraflı Not"),
 
-              // Ses Seçenekleri Açılır Menü (Task)
               showAudioMenu === "task" && e("div", { className: "absolute top-12 left-1/3 z-30 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-1.5 space-y-1 animate-fadeIn" },
                 e("button", {
                   onClick: () => { setShowAudioMenu(null); startLiveListening("task"); },
@@ -907,9 +951,9 @@
                 )
               ),
 
-              // 4. SOFT ARKA PLAN RENK SEÇİCİ (FORM)
+              // Soft Renk Seçici
               e("div", { className: "space-y-1" },
-                e("label", { className: "text-[10px] font-black text-slate-400 block" }, "Kart Rengi (Soft)"),
+                e("label", { className: "text-[10px] font-black text-slate-400 block" }, "Kart Rengi"),
                 e("div", { className: "flex items-center gap-2" },
                   softColors.map(c => e("button", {
                     key: c.code,
@@ -921,15 +965,26 @@
                 )
               ),
 
-              // 5. ALARM SEÇİCİ (FORM)
+              // Alarm Seçici (Sesli & Titreşimli)
               e("div", { className: "space-y-1" },
-                e("label", { className: "text-[10px] font-black text-slate-400 block" }, "⏰ Alarm / Bildirim Saatı"),
-                e("input", {
-                  type: "datetime-local",
-                  value: newTaskAlarm,
-                  onChange: (ev) => setNewTaskAlarm(ev.target.value),
-                  className: "w-full p-1.5 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs font-bold outline-none"
-                })
+                e("label", { className: "text-[10px] font-black text-slate-400 block" }, "⏰ Alarm Zamanı & Bildirim Tipi"),
+                e("div", { className: "flex gap-2" },
+                  e("input", {
+                    type: "datetime-local",
+                    value: newTaskAlarm,
+                    onChange: (ev) => setNewTaskAlarm(ev.target.value),
+                    className: "flex-1 p-1.5 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs font-bold outline-none"
+                  }),
+                  e("select", {
+                    value: newTaskAlarmType,
+                    onChange: (ev) => setNewTaskAlarmType(ev.target.value),
+                    className: "p-1.5 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs font-bold outline-none"
+                  },
+                    e("option", { value: "both" }, "🔔 Ses + Titreşim"),
+                    e("option", { value: "sound" }, "🔊 Sadece Ses"),
+                    e("option", { value: "vibrate" }, "📳 Sadece Titreşim")
+                  )
+                )
               ),
 
               selectedTaskImage && e("div", { className: "relative w-20 h-20 my-1" },
@@ -945,11 +1000,11 @@
               e("button", { onClick: addTask, className: "w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-bold shadow-xs" }, "Kaydet")
             ),
 
-            // Görev Listesi
-            filteredTasks.map(task => e("div", { 
+            // Öncelik Sıralı Görev Listesi
+            sortedTasks.map(task => e("div", { 
               key: task.id, 
               style: task.bgColor && task.bgColor !== "#ffffff" ? { backgroundColor: task.bgColor, color: "#1e293b" } : {},
-              className: `p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col gap-2 shadow-xs ${!task.bgColor || task.bgColor === "#ffffff" ? "bg-white/95 dark:bg-slate-900/95" : ""}` 
+              className: `p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col gap-2 shadow-xs ${!task.bgColor || task.bgColor === "#ffffff" ? "bg-white/95 dark:bg-slate-900/95" : ""}` 
             },
               e("div", { className: "flex items-start justify-between gap-2" },
                 e("div", { className: "flex items-start gap-2 flex-1" },
@@ -966,9 +1021,15 @@
                     )
                   )
                 ),
-                e("div", { className: "flex items-center gap-1" },
-                  e("button", { onClick: () => setEditingItem({ type: 'task', data: task }), className: "text-slate-400 hover:text-blue-600 text-xs px-1" }, "✏️"),
-                  e("button", { onClick: () => deleteTaskFromFirebase(task.id), className: "text-slate-400 hover:text-rose-600 text-xs px-1" }, "🗑️")
+                
+                // Sağ Üst Simge ve Eklenme Tarihi Alanı
+                e("div", { className: "flex flex-col items-end gap-1" },
+                  e("div", { className: "flex items-center gap-1" },
+                    e("button", { onClick: () => setEditingItem({ type: 'task', data: task }), className: "text-slate-400 hover:text-blue-600 text-xs px-1" }, "✏️"),
+                    e("button", { onClick: () => deleteTaskFromFirebase(task.id), className: "text-slate-400 hover:text-rose-600 text-xs px-1" }, "🗑️")
+                  ),
+                  // Notun Eklendiği Tarih (Simgelerin Altında)
+                  e("span", { className: "text-[9px] text-slate-400 dark:text-slate-500 font-bold tracking-tight" }, task.createdDate || task.date)
                 )
               ),
 
@@ -1107,7 +1168,6 @@
                     className: "px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 border rounded-lg text-[10px] font-bold"
                   }, "📷 Resim"),
 
-                  // Ses Seçenekleri Açılır Menü (Note)
                   showAudioMenu === "note" && e("div", { className: "absolute bottom-10 right-10 z-30 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-1.5 space-y-1 animate-fadeIn" },
                     e("button", {
                       onClick: () => { setShowAudioMenu(null); startLiveListening("note"); },
@@ -1170,6 +1230,143 @@
                 ))
               )
             )
+          ),
+
+          /* ---------------- 3. "SİZ" EKRANI (WHATSAPP TARZI PROFİL & AYARLAR) ---------------- */
+          activeTab === "profile" && e("div", { className: "space-y-4 animate-fadeIn" },
+            
+            // Profil Kartı
+            e("div", { className: "p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4" },
+              e("div", { className: "relative group" },
+                e("div", { className: "w-16 h-16 rounded-full overflow-hidden border-2 border-blue-600 bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-black text-xl text-slate-400 shadow-inner" },
+                  profile.avatar ? e("img", { src: profile.avatar, className: "w-full h-full object-cover" }) : profile.fullName.charAt(0)
+                ),
+                e("button", {
+                  onClick: () => avatarFileInputRef.current && avatarFileInputRef.current.click(),
+                  className: "absolute bottom-0 right-0 bg-blue-600 text-white p-1 rounded-full text-[10px] shadow-lg"
+                }, "📷")
+              ),
+              e("div", { className: "flex-1 space-y-0.5" },
+                e("h3", { className: "font-black text-sm text-slate-900 dark:text-white" }, profile.fullName),
+                e("p", { className: "text-[11px] text-slate-500 font-medium" }, profile.email),
+                e("p", { className: "text-[11px] text-slate-400 font-medium" }, profile.phone)
+              )
+            ),
+
+            // Kişisel Bilgiler Düzenleme Formu
+            e("div", { className: "p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-3" },
+              e("h4", { className: "font-black text-xs text-slate-800 dark:text-slate-200 flex items-center gap-1.5" }, "👤 Profil & Kişisel Bilgiler"),
+              
+              e("div", { className: "space-y-2" },
+                e("div", null,
+                  e("label", { className: "text-[10px] font-bold text-slate-400 block mb-0.5" }, "Ad Soyad"),
+                  e("input", {
+                    type: "text",
+                    value: profile.fullName,
+                    onChange: (ev) => saveProfile({ ...profile, fullName: ev.target.value }),
+                    className: "w-full p-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs font-semibold outline-none"
+                  })
+                ),
+                e("div", null,
+                  e("label", { className: "text-[10px] font-bold text-slate-400 block mb-0.5" }, "E-posta Adresi"),
+                  e("input", {
+                    type: "email",
+                    value: profile.email,
+                    onChange: (ev) => saveProfile({ ...profile, email: ev.target.value }),
+                    className: "w-full p-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs font-semibold outline-none"
+                  })
+                ),
+                e("div", null,
+                  e("label", { className: "text-[10px] font-bold text-slate-400 block mb-0.5" }, "Telefon Numarası"),
+                  e("input", {
+                    type: "text",
+                    value: profile.phone,
+                    onChange: (ev) => saveProfile({ ...profile, phone: ev.target.value }),
+                    className: "w-full p-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs font-semibold outline-none"
+                  })
+                )
+              )
+            ),
+
+            // WhatsApp Tarzı Tema ve Arka Plan Seçenekleri
+            e("div", { className: "p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-3" },
+              e("h4", { className: "font-black text-xs text-slate-800 dark:text-slate-200 flex items-center gap-1.5" }, "🎨 WhatsApp Tarzı Temalar"),
+              
+              e("div", { className: "grid grid-cols-3 gap-2 text-[10px] font-bold" },
+                e("button", { 
+                  onClick: () => handleBgChange("default"), 
+                  className: `p-2.5 rounded-xl border text-center ${bgPattern === "default" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : ""}` 
+                }, "Açık Tema"),
+                e("button", { 
+                  onClick: () => handleBgChange("whatsapp_dark"), 
+                  className: `p-2.5 rounded-xl border text-center ${bgPattern === "whatsapp_dark" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : ""}` 
+                }, "WhatsApp Koyu"),
+                e("button", { 
+                  onClick: () => handleBgChange("whatsapp_light"), 
+                  className: `p-2.5 rounded-xl border text-center ${bgPattern === "whatsapp_light" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : ""}` 
+                }, "WhatsApp Krem"),
+                e("button", { 
+                  onClick: () => handleBgChange("dots"), 
+                  className: `p-2.5 rounded-xl border text-center ${bgPattern === "dots" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : ""}` 
+                }, "Noktalı"),
+                e("button", { 
+                  onClick: () => handleBgChange("grid"), 
+                  className: `p-2.5 rounded-xl border text-center ${bgPattern === "grid" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : ""}` 
+                }, "Izgara"),
+                e("button", { 
+                  onClick: () => bgFileInputRef.current && bgFileInputRef.current.click(), 
+                  className: `p-2.5 rounded-xl border text-center ${bgPattern === "custom" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : ""}` 
+                }, "🖼️ Görsel Yükle")
+              )
+            ),
+
+            // Güvenlik & Oturum
+            e("div", { className: "p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between" },
+              e("div", null,
+                e("h4", { className: "font-black text-xs text-slate-800 dark:text-slate-200" }, "🔒 Güvenlik & Oturum"),
+                e("p", { className: "text-[10px] text-slate-400 font-medium" }, "PIN Kilidi ve Oturum Yönetimi")
+              ),
+              e("button", {
+                onClick: handleLogout,
+                className: "px-3 py-1.5 bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 rounded-xl text-xs font-bold"
+              }, "Çıkış Yap")
+            )
+          )
+        ),
+
+        /* ---------------- WHATSAPP TARZI ALT NAVİGASYON BAR (SABİT) ---------------- */
+        e("nav", { className: "fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 flex items-center justify-around py-2 z-40 shadow-2xl" },
+          
+          // 1. Görevler Sekmesi
+          e("button", {
+            onClick: () => setActiveTab("daily"),
+            className: `flex flex-col items-center gap-0.5 transition-all ${activeTab === "daily" ? "text-blue-600 dark:text-blue-400 scale-105 font-black" : "text-slate-400 font-medium"}`
+          },
+            e("span", { className: "text-lg" }, "☑️"),
+            e("span", { className: "text-[10px]" }, "Görevler")
+          ),
+
+          // 2. Toplantılar Sekmesi
+          e("button", {
+            onClick: () => setActiveTab("meetings"),
+            className: `flex flex-col items-center gap-0.5 transition-all ${activeTab === "meetings" ? "text-blue-600 dark:text-blue-400 scale-105 font-black" : "text-slate-400 font-medium"}`
+          },
+            e("span", { className: "text-lg" }, "📁"),
+            e("span", { className: "text-[10px]" }, "Toplantılar")
+          ),
+
+          // 3. "Siz" Sekmesi (Profil Fotoğraflı)
+          e("button", {
+            onClick: () => setActiveTab("profile"),
+            className: `flex flex-col items-center gap-0.5 transition-all ${activeTab === "profile" ? "text-blue-600 dark:text-blue-400 scale-105 font-black" : "text-slate-400 font-medium"}`
+          },
+            profile.avatar ? e("img", { 
+              src: profile.avatar, 
+              className: `w-6 h-6 rounded-full object-cover border ${activeTab === "profile" ? "border-blue-600 ring-2 ring-blue-600/30" : "border-slate-400"}` 
+            }) : e("div", { 
+              className: `w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[10px] font-bold ${activeTab === "profile" ? "bg-blue-600 text-white" : ""}` 
+            }, profile.fullName.charAt(0)),
+            e("span", { className: "text-[10px]" }, "Siz")
           )
         )
       );
