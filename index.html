@@ -4,99 +4,79 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kişisel Verimlilik Paneli</title>
-    <!-- Font Awesome İkonları -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
-            --bg-color: #f2f2f7;
-            --card-bg: rgba(255, 255, 255, 0.85);
-            --accent-color: #007aff;
-            --text-primary: #1c1c1e;
-            --text-secondary: #8e8e93;
-            --border-color: rgba(200, 200, 205, 0.4);
+            --bg-color: #f5f5f7;
+            --card-bg: rgba(255, 255, 255, 0.75);
+            --accent-color: #0071e3;
+            --text-primary: #1d1d1f;
+            --text-secondary: #86868b;
+            --border-color: rgba(220, 220, 225, 0.6);
             --radius: 16px;
-            --shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
-
-            /* Öncelik Renkleri */
-            --prio-high: #ff3b30;
-            --prio-medium: #ff9500;
-            --prio-low: #34c759;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             -webkit-tap-highlight-color: transparent;
         }
 
         body {
-            background-color: #e5e5ea;
-            background-image: radial-gradient(#d1d1d6 1px, transparent 1px);
-            background-size: 20px 20px;
+            background-color: var(--bg-color);
             color: var(--text-primary);
             display: flex;
             justify-content: center;
-            align-items: flex-start;
             min-height: 100vh;
-            padding: 20px 10px;
         }
 
         .app-container {
             display: flex;
             width: 100%;
-            max-width: 1050px;
-            min-height: 720px;
-            background: rgba(255, 255, 255, 0.70);
-            backdrop-filter: blur(25px);
-            -webkit-backdrop-filter: blur(25px);
+            max-width: 1200px;
+            margin: 20px;
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             border-radius: 24px;
-            border: 1px solid rgba(255, 255, 255, 0.8);
+            border: 1px solid var(--border-color);
             overflow: hidden;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.08);
         }
 
         /* Sidebar */
         .sidebar {
             width: 260px;
-            background: rgba(246, 246, 249, 0.6);
-            padding: 28px 20px;
+            background: rgba(240, 240, 245, 0.5);
+            padding: 24px;
             border-right: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
         }
 
         .profile-section {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 32px;
         }
 
         .avatar {
-            width: 38px;
-            height: 38px;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
             background: var(--accent-color);
             color: white;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
-        }
-
-        .profile-section h2 {
-            font-size: 17px;
-            font-weight: 600;
         }
 
         .nav-menu {
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 8px;
         }
 
         .nav-btn {
@@ -106,50 +86,31 @@
             padding: 12px 16px;
             border: none;
             background: transparent;
-            border-radius: 12px;
+            border-radius: 10px;
             color: var(--text-primary);
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 500;
             cursor: pointer;
             transition: all 0.2s ease;
             text-align: left;
         }
 
-        .nav-btn i {
-            font-size: 16px;
-            width: 20px;
-            text-align: center;
-            color: var(--accent-color);
-        }
-
-        .nav-btn:hover { background: rgba(0, 0, 0, 0.04); }
+        .nav-btn:hover { background: rgba(0, 0, 0, 0.05); }
 
         .nav-btn.active {
             background: var(--accent-color);
             color: white;
-            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
         }
 
-        .nav-btn.active i { color: white; }
-
-        /* Main Area */
+        /* Main Content */
         .main-content {
             flex: 1;
             padding: 32px;
             overflow-y: auto;
         }
 
-        .tab-content {
-            display: none;
-            animation: fadeIn 0.2s ease-in-out;
-        }
-
+        .tab-content { display: none; }
         .tab-content.active { display: block; }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(3px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
 
         .section-header {
             display: flex;
@@ -160,48 +121,53 @@
 
         .section-header h1 {
             font-size: 28px;
-            font-weight: 700;
+            font-weight: 600;
         }
 
+        .date-badge {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* Cards & Forms */
         .card {
             background: var(--card-bg);
-            border: 1px solid rgba(255, 255, 255, 0.9);
+            border: 1px solid var(--border-color);
             border-radius: var(--radius);
             padding: 20px;
             margin-bottom: 20px;
             box-shadow: var(--shadow);
         }
 
-        .form-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 10px;
+        .add-card {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
         }
 
+        .flex-col { flex-direction: column; align-items: stretch; }
+
         input[type="text"], textarea, select {
-            width: 100%;
-            padding: 12px 14px;
+            padding: 12px 16px;
             border: 1px solid var(--border-color);
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.8);
             outline: none;
             font-size: 14px;
-            color: var(--text-primary);
-            transition: all 0.2s;
         }
 
         input[type="text"]:focus, textarea:focus, select:focus {
             border-color: var(--accent-color);
-            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
         }
 
-        .action-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 10px;
-            margin-top: 8px;
+        .task-input-field { flex: 1; min-width: 200px; }
+
+        .small-select {
+            padding: 10px;
+            font-size: 13px;
+            border-radius: 8px;
+            background: white;
         }
 
         .apple-btn {
@@ -209,104 +175,80 @@
             color: white;
             border: none;
             padding: 12px 20px;
-            border-radius: 12px;
-            font-weight: 600;
-            font-size: 14px;
+            border-radius: 10px;
+            font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s;
-            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.25);
+            transition: opacity 0.2s;
         }
 
-        .apple-btn:active { transform: scale(0.98); }
+        .apple-btn:hover { opacity: 0.9; }
 
-        /* Ses Kaydı Butonu */
+        /* Ses Kayıt Butonu */
         .mic-btn {
-            background: rgba(0, 0, 0, 0.05);
+            background: #e5e5ea;
             color: var(--text-primary);
-            border: 1px solid var(--border-color);
-            padding: 10px 16px;
-            border-radius: 12px;
+            border: none;
+            padding: 10px 14px;
+            border-radius: 10px;
             font-size: 13px;
-            font-weight: 500;
             cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 8px;
-            transition: all 0.2s;
+            gap: 6px;
         }
 
         .mic-btn.recording {
             background: #ff3b30;
             color: white;
-            border-color: #ff3b30;
-            animation: pulse 1.2s infinite;
         }
 
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(255, 59, 48, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0); }
-        }
-
-        /* Liste Yapısı ve Rozetler */
+        /* Lists & Badges */
         .apple-list { list-style: none; }
 
         .apple-list li {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
-            padding: 16px 20px;
-            border-radius: 14px;
+            padding: 16px;
+            border-radius: 12px;
             margin-bottom: 10px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 12px;
-        }
-
-        .task-info {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
         }
 
         .badge {
-            padding: 4px 10px;
-            border-radius: 8px;
+            padding: 4px 8px;
+            border-radius: 6px;
             font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
+            font-weight: 600;
+            margin-right: 8px;
         }
+        .badge-type { background: #e5e5ea; color: #3a3a3c; }
+        .badge-high { background: #ffe5e5; color: #ff3b30; }
+        .badge-medium { background: #fff4e5; color: #ff9500; }
+        .badge-low { background: #e5f9e5; color: #34c759; }
 
-        .badge-type {
-            background: rgba(0, 122, 255, 0.1);
-            color: var(--accent-color);
-        }
-
-        .badge-high { background: rgba(255, 59, 48, 0.15); color: var(--prio-high); }
-        .badge-medium { background: rgba(255, 149, 0, 0.15); color: var(--prio-medium); }
-        .badge-low { background: rgba(52, 199, 89, 0.15); color: var(--prio-low); }
-
-        /* Dosya Yükleme */
+        /* File Upload */
         .file-upload-wrapper {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            margin: 12px 0;
         }
 
         .file-label {
             background: #e5e5ea;
             padding: 8px 14px;
-            border-radius: 10px;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 13px;
             font-weight: 500;
         }
 
         #note-file { display: none; }
+        #file-name-display { font-size: 13px; color: var(--text-secondary); }
 
-        /* Takvim */
+        /* Calendar */
         .calendar-grid {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
@@ -316,33 +258,25 @@
         }
 
         .calendar-day {
-            padding: 14px 8px;
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.6);
+            padding: 14px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.5);
             font-size: 14px;
-            font-weight: 500;
-            border: 1px solid var(--border-color);
         }
 
         .calendar-day.today {
             background: var(--accent-color);
             color: white;
-            font-weight: 700;
+            font-weight: bold;
         }
 
         @media (max-width: 768px) {
-            body { padding: 0; }
-            .app-container { flex-direction: column; border-radius: 0; min-height: 100vh; border: none; }
-            .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border-color); padding: 16px; }
-            .nav-menu { flex-direction: row; }
-            .nav-btn { flex: 1; justify-content: center; font-size: 12px; padding: 10px 4px; }
-            .main-content { padding: 20px 16px; }
-            .form-grid { grid-template-columns: 1fr; }
+            .app-container { flex-direction: column; margin: 0; border-radius: 0; }
+            .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border-color); }
         }
     </style>
 </head>
 <body>
-
     <div class="app-container">
         <!-- Sidebar -->
         <aside class="sidebar">
@@ -370,33 +304,32 @@
             <section id="tasks" class="tab-content active">
                 <header class="section-header">
                     <h1>Görevler</h1>
+                    <span class="date-badge" id="current-date"></span>
                 </header>
 
-                <div class="card">
-                    <input type="text" id="task-input" placeholder="Görev tanımını yazın veya sesli söyleyin..." style="margin-bottom: 10px;">
+                <div class="card add-card">
+                    <input type="text" id="task-input" class="task-input-field" placeholder="Yeni bir görev ekleyin...">
                     
-                    <div class="form-grid">
-                        <select id="task-type">
-                            <option value="Üretim">🏭 Üretim</option>
-                            <option value="Kalite">🔍 Kalite</option>
-                            <option value="Yönetim">📊 Yönetim / Proje</option>
-                            <option value="Lojistik">📦 Lojistik</option>
-                            <option value="Genel" selected>📌 Genel</option>
-                        </select>
+                    <!-- Tür Seçimi -->
+                    <select id="task-type" class="small-select">
+                        <option value="Genel">Genel</option>
+                        <option value="Üretim">Üretim</option>
+                        <option value="Kalite">Kalite</option>
+                        <option value="Yönetim">Yönetim</option>
+                    </select>
 
-                        <select id="task-prio">
-                            <option value="high">🔴 Yüksek Öncelik</option>
-                            <option value="medium" selected>🟡 Orta Öncelik</option>
-                            <option value="low">🟢 Düşük Öncelik</option>
-                        </select>
-                    </div>
+                    <!-- Öncelik Seçimi -->
+                    <select id="task-prio" class="small-select">
+                        <option value="low">Düşük Öncelik</option>
+                        <option value="medium" selected>Orta Öncelik</option>
+                        <option value="high">Yüksek Öncelik</option>
+                    </select>
 
-                    <div class="action-row">
-                        <button class="mic-btn" id="task-mic-btn" onclick="toggleSpeech('task-input', 'task-mic-btn')">
-                            <i class="fa-solid fa-microphone"></i> Sesle Yazdır
-                        </button>
-                        <button class="apple-btn" onclick="addTask()">Görev Ekle</button>
-                    </div>
+                    <button class="mic-btn" id="task-mic-btn" onclick="toggleSpeech('task-input', 'task-mic-btn')">
+                        <i class="fa-solid fa-microphone"></i>
+                    </button>
+                    
+                    <button class="apple-btn" onclick="addTask()">Ekle</button>
                 </div>
 
                 <ul id="task-list" class="apple-list"></ul>
@@ -408,7 +341,9 @@
                     <h1>Takvim & Etkinlikler</h1>
                 </header>
                 <div class="card">
-                    <h3 id="calendar-month-year" style="font-size: 16px; font-weight: 600;"></h3>
+                    <div class="calendar-header">
+                        <h3 id="calendar-month-year"></h3>
+                    </div>
                     <div class="calendar-grid" id="calendar-grid"></div>
                 </div>
             </section>
@@ -419,24 +354,22 @@
                     <h1>Toplantı Notları</h1>
                 </header>
                 
-                <div class="card">
-                    <input type="text" id="note-title" placeholder="Toplantı Başlığı" style="margin-bottom: 10px;">
-                    <textarea id="note-body" placeholder="Notlarınızı yazın veya ses kaydını başlatın..." rows="4"></textarea>
+                <div class="card add-card flex-col">
+                    <input type="text" id="note-title" placeholder="Toplantı Başlığı" style="width: 100%;">
+                    <textarea id="note-body" placeholder="Notlarınızı buraya yazın..." rows="4" style="width: 100%;"></textarea>
                     
-                    <div class="action-row">
-                        <div class="file-upload-wrapper">
-                            <button class="mic-btn" id="note-mic-btn" onclick="toggleSpeech('note-body', 'note-mic-btn')">
-                                <i class="fa-solid fa-microphone"></i> Sesle Yaz
-                            </button>
-                            <label for="note-file" class="file-label">
-                                <i class="fa-solid fa-paperclip"></i> Ek Ekle
-                            </label>
-                            <input type="file" id="note-file" accept="image/*,application/pdf" onchange="handleFileSelect(event)">
-                            <span id="file-name-display" style="font-size: 12px; color: var(--text-secondary);">Dosya seçilmedi</span>
-                        </div>
-
-                        <button class="apple-btn" onclick="addNote()">Notu Kaydet</button>
+                    <div class="file-upload-wrapper">
+                        <button class="mic-btn" id="note-mic-btn" onclick="toggleSpeech('note-body', 'note-mic-btn')">
+                            <i class="fa-solid fa-microphone"></i> Sesle Yazdır
+                        </button>
+                        <label for="note-file" class="file-label">
+                            <i class="fa-solid fa-paperclip"></i> Fotoğraf veya Ek Ekle
+                        </label>
+                        <input type="file" id="note-file" accept="image/*,application/pdf" onchange="handleFileSelect(event)">
+                        <span id="file-name-display">Dosya seçilmedi</span>
                     </div>
+
+                    <button class="apple-btn" style="align-self: flex-end;" onclick="addNote()">Notu Kaydet</button>
                 </div>
 
                 <div id="notes-list"></div>
@@ -446,101 +379,91 @@
     </div>
 
     <script>
-        // Sekme Değiştirme
+        // Tarih
+        document.getElementById('current-date').innerText = new Date().toLocaleDateString('tr-TR', {
+            weekday: 'long', day: 'numeric', month: 'long'
+        });
+
+        // Sekmeler
         function switchTab(tabId, btn) {
-            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            
             document.getElementById(tabId).classList.add('active');
             btn.classList.add('active');
-
             if(tabId === 'calendar') renderCalendar();
         }
 
-        // --- 1 & 2. CANLI SES TANIMA VE MİKROFONU OTOMATİK KAPATMA ---
+        // Canlı Ses Tanıma & Otomatik Kapanma
         let recognition = null;
         let isRecording = false;
 
-        function toggleSpeech(targetInputId, btnId) {
+        function toggleSpeech(targetId, btnId) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            
             if (!SpeechRecognition) {
-                alert("Tarayıcınız sesle yazmayı desteklemiyor. Lütfen Safari veya Chrome kullanın.");
+                alert("Tarayıcınız sesle yazmayı desteklemiyor.");
                 return;
             }
 
-            const inputEl = document.getElementById(targetInputId);
+            const inputEl = document.getElementById(targetId);
             const btnEl = document.getElementById(btnId);
 
             if (isRecording) {
-                stopSpeechRecognition(btnEl);
+                stopSpeech(btnEl);
                 return;
             }
 
             recognition = new SpeechRecognition();
             recognition.lang = 'tr-TR';
-            recognition.continuous = true;      // Sürekli dinle
-            recognition.interimResults = true;  // CANLI / ANLIK YAZMA AKTİF
+            recognition.continuous = true;
+            recognition.interimResults = true;
 
             recognition.onstart = function() {
                 isRecording = true;
                 btnEl.classList.add('recording');
-                btnEl.innerHTML = `<i class="fa-solid fa-square"></i> Kaydı Durdur`;
             };
 
-            // Konuşma sırasında ANLIK olarak metin kutusunu doldurur
-            recognition.onresult = function(event) {
-                let transcript = '';
-                for (let i = 0; i < event.results.length; i++) {
-                    transcript += event.results[i][0].transcript;
+            recognition.onresult = function(e) {
+                let text = '';
+                for (let i = 0; i < e.results.length; i++) {
+                    text += e.results[i][0].transcript;
                 }
-                inputEl.value = transcript;
+                inputEl.value = text;
             };
 
-            recognition.onerror = function(event) {
-                console.error("Ses tanıma hatası:", event.error);
-                stopSpeechRecognition(btnEl);
-            };
-
-            // Konuşma bittiğinde veya mikrofon kapandığında donanımı tamamen serbest bırakır
-            recognition.onend = function() {
-                stopSpeechRecognition(btnEl);
-            };
+            recognition.onerror = function() { stopSpeech(btnEl); };
+            recognition.onend = function() { stopSpeech(btnEl); };
 
             recognition.start();
         }
 
-        function stopSpeechRecognition(btnEl) {
+        function stopSpeech(btnEl) {
             if (recognition) {
                 recognition.stop();
                 recognition = null;
             }
             isRecording = false;
-            if (btnEl) {
-                btnEl.classList.remove('recording');
-                btnEl.innerHTML = `<i class="fa-solid fa-microphone"></i> Sesle Yaz`;
-            }
+            if (btnEl) btnEl.classList.remove('recording');
         }
 
-        // --- 3 & 4. GÖREV YÖNETİMİ (ÖNCELİK VE TÜRLER) ---
+        // Görevler
         let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
 
         function renderTasks() {
             const list = document.getElementById('task-list');
             list.innerHTML = '';
-            
             tasks.forEach((t, i) => {
-                const prioText = t.prio === 'high' ? 'Yüksek' : (t.prio === 'medium' ? 'Orta' : 'Düşük');
-                const prioClass = `badge-${t.prio}`;
+                const prioLabel = t.prio === 'high' ? 'Yüksek' : (t.prio === 'medium' ? 'Orta' : 'Düşük');
+                const prioClass = `badge-${t.prio || 'medium'}`;
+                const typeText = t.type || 'Genel';
 
                 list.innerHTML += `
                     <li>
-                        <div class="task-info">
-                            <span class="badge badge-type">${t.type || 'Genel'}</span>
-                            <span class="badge ${prioClass}">${prioText}</span>
-                            <span style="font-weight: 500;">${t.text}</span>
+                        <div>
+                            <span class="badge badge-type">${typeText}</span>
+                            <span class="badge ${prioClass}">${prioLabel}</span>
+                            <span>${t.text}</span>
                         </div>
-                        <button onclick="deleteTask(${i})" style="border:none; background:none; color:#ff3b30; cursor:pointer; font-size:15px;">
+                        <button onclick="deleteTask(${i})" style="border:none; background:none; color:#ff3b30; cursor:pointer;">
                             <i class="fa-solid fa-trash"></i>
                         </button>
                     </li>`;
@@ -552,7 +475,7 @@
             const type = document.getElementById('task-type').value;
             const prio = document.getElementById('task-prio').value;
 
-            if (input.value.trim()) {
+            if (input.value.trim() !== '') {
                 tasks.push({ text: input.value.trim(), type: type, prio: prio });
                 localStorage.setItem('tasks', JSON.stringify(tasks));
                 input.value = '';
@@ -566,15 +489,15 @@
             renderTasks();
         }
 
-        // --- DOSYA & TOPLANTI NOTLARI ---
+        // Notlar
         let selectedFileBase64 = '';
         function handleFileSelect(e) {
             const file = e.target.files[0];
             if (file) {
                 document.getElementById('file-name-display').innerText = file.name;
-                const reader = new FileReader();
-                reader.onload = (ev) => selectedFileBase64 = ev.target.result;
-                reader.readAsDataURL(file);
+                const r = new FileReader();
+                r.onload = (ev) => selectedFileBase64 = ev.target.result;
+                r.readAsDataURL(file);
             }
         }
 
@@ -583,13 +506,13 @@
             const container = document.getElementById('notes-list');
             container.innerHTML = '';
             notes.forEach((n) => {
-                let imgHtml = n.file ? `<div style="margin-top:10px;"><img src="${n.file}" style="max-width:100%; border-radius:10px;"></div>` : '';
+                let img = n.file ? `<div style="margin-top:10px;"><img src="${n.file}" style="max-width:100%; border-radius:8px;"></div>` : '';
                 container.innerHTML += `
                     <div class="card">
-                        <h3 style="font-size:16px; font-weight:600;">${n.title}</h3>
-                        <p style="margin-top:8px; color:#3a3a3c; font-size:14px; line-height:1.4;">${n.body}</p>
-                        ${imgHtml}
-                        <small style="color:#8e8e93; display:block; margin-top:10px; font-size:12px;">${n.date}</small>
+                        <h3>${n.title}</h3>
+                        <p style="margin-top:8px; color:#3a3a3c;">${n.body}</p>
+                        ${img}
+                        <small style="color:#86868b; display:block; margin-top:10px;">${n.date}</small>
                     </div>`;
             });
         }
@@ -608,7 +531,7 @@
             }
         }
 
-        // --- TAKVİM ---
+        // Takvim
         function renderCalendar() {
             const grid = document.getElementById('calendar-grid');
             const monthYear = document.getElementById('calendar-month-year');
@@ -616,14 +539,12 @@
             const now = new Date();
             monthYear.innerText = now.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
             const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-            
             for (let i = 1; i <= daysInMonth; i++) {
                 const today = i === now.getDate() ? 'today' : '';
                 grid.innerHTML += `<div class="calendar-day ${today}">${i}</div>`;
             }
         }
 
-        // İlk Yükleme
         renderTasks();
         renderNotes();
     </script>
