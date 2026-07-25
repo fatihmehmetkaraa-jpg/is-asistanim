@@ -88,7 +88,7 @@
       const [selectedFolderId, setSelectedFolderId] = useState(null);
       const [selectedSessionId, setSelectedSessionId] = useState(null);
 
-      // Resim Onizleme Modal State
+      // Resim Önizleme Modal State
       const [previewImageUrl, setPreviewImageUrl] = useState(null);
 
       // Ref'ler
@@ -106,6 +106,7 @@
       const [showAddForm, setShowAddForm] = useState(false);
       const [newTaskTitle, setNewTaskTitle] = useState("");
       const [newTaskPriority, setNewTaskPriority] = useState("Yüksek");
+      const [newTaskCategory, setNewTaskCategory] = useState("Üretim");
 
       const [newMeetingTitle, setNewMeetingTitle] = useState("");
       const [newSessionDate, setNewSessionDate] = useState(todayISO);
@@ -233,7 +234,7 @@
           date: selectedDate,
           completed: false,
           priority: newTaskPriority || "Yüksek",
-          category: "Üretim",
+          category: newTaskCategory || "Üretim",
           image: selectedTaskImage,
           isRollover: false
         };
@@ -359,6 +360,16 @@
       const activeSessionObj = activeFolderObj?.sessions?.find(s => s.id === selectedSessionId);
       const filteredTasks = tasks.filter(t => t.date === selectedDate);
 
+      // Öncelik Rozeti Rengi Helper
+      const getPriorityBadgeClass = (priority) => {
+        switch (priority) {
+          case "Yüksek": return "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 border-rose-200 dark:border-rose-800";
+          case "Orta": return "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border-amber-200 dark:border-amber-800";
+          case "Düşük": return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800";
+          default: return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700";
+        }
+      };
+
       return e("div", { className: "max-w-md mx-auto min-h-screen flex flex-col pb-12 relative" },
         
         // TAM EKRAN RESİM İNCELEME MODALI
@@ -475,9 +486,44 @@
               e("button", { onClick: () => taskFileInputRef.current && taskFileInputRef.current.click(), className: "py-2.5 bg-white dark:bg-slate-900 border rounded-xl font-extrabold text-xs" }, "📷 Resim")
             ),
 
-            showAddForm && e("div", { className: "p-3 bg-white dark:bg-slate-900 rounded-2xl border space-y-2 shadow-xs" },
-              e("input", { type: "text", placeholder: "Görev tanımı...", value: newTaskTitle, onChange: (ev) => setNewTaskTitle(ev.target.value), className: "w-full p-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs outline-none" }),
+            showAddForm && e("div", { className: "p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2.5 shadow-xs" },
+              e("input", { 
+                type: "text", 
+                placeholder: "Görev tanımı...", 
+                value: newTaskTitle, 
+                onChange: (ev) => setNewTaskTitle(ev.target.value), 
+                className: "w-full p-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs outline-none" 
+              }),
               
+              // Yan yana Öncelik ve Tür Seçimi
+              e("div", { className: "flex gap-2" },
+                e("div", { className: "flex-1 space-y-1" },
+                  e("label", { className: "text-[10px] font-black text-slate-400 block" }, "Öncelik"),
+                  e("select", {
+                    value: newTaskPriority,
+                    onChange: (ev) => setNewTaskPriority(ev.target.value),
+                    className: "w-full p-1.5 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs font-bold outline-none"
+                  },
+                    e("option", { value: "Yüksek" }, "🔴 Yüksek"),
+                    e("option", { value: "Orta" }, "🟠 Orta"),
+                    e("option", { value: "Düşük" }, "🟢 Düşük")
+                  )
+                ),
+                e("div", { className: "flex-1 space-y-1" },
+                  e("label", { className: "text-[10px] font-black text-slate-400 block" }, "Kategori / Tür"),
+                  e("select", {
+                    value: newTaskCategory,
+                    onChange: (ev) => setNewTaskCategory(ev.target.value),
+                    className: "w-full p-1.5 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs font-bold outline-none"
+                  },
+                    e("option", { value: "Üretim" }, "⚙️ Üretim"),
+                    e("option", { value: "Kalite" }, "🔍 Kalite"),
+                    e("option", { value: "Yönetim" }, "📋 Yönetim"),
+                    e("option", { value: "Genel" }, "📌 Genel")
+                  )
+                )
+              ),
+
               selectedTaskImage && e("div", { className: "relative w-20 h-20 my-1" },
                 e("img", { src: selectedTaskImage, className: "w-full h-full object-cover rounded-xl border" }),
                 e("button", { onClick: () => setSelectedTaskImage(null), className: "absolute -top-1.5 -right-1.5 bg-rose-500 text-white w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shadow" }, "✕")
@@ -491,12 +537,18 @@
               className: "p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col gap-2" 
             },
               e("div", { className: "flex items-center justify-between gap-2" },
-                e("div", { className: "flex items-center gap-2 flex-1" },
+                e("div", { className: "flex items-start gap-2 flex-1" },
                   e("button", {
                     onClick: () => toggleTask(task.id),
-                    className: `w-4 h-4 rounded border flex items-center justify-center text-xs font-bold ${task.completed ? "bg-blue-600 text-white border-blue-600" : "border-slate-400"}`
+                    className: `w-4 h-4 mt-0.5 rounded border flex items-center justify-center text-xs font-bold shrink-0 ${task.completed ? "bg-blue-600 text-white border-blue-600" : "border-slate-400"}`
                   }, task.completed ? "✓" : ""),
-                  e("span", { className: `text-xs font-semibold ${task.completed ? "line-through text-slate-400" : ""}` }, task.title)
+                  e("div", { className: "space-y-1" },
+                    e("span", { className: `text-xs font-semibold block ${task.completed ? "line-through text-slate-400" : ""}` }, task.title),
+                    e("div", { className: "flex gap-1.5 items-center" },
+                      e("span", { className: `text-[9px] font-black px-1.5 py-0.5 rounded border ${getPriorityBadgeClass(task.priority)}` }, task.priority || "Yüksek"),
+                      e("span", { className: "text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700" }, task.category || "Üretim")
+                    )
+                  )
                 ),
                 e("button", { onClick: () => deleteTaskFromFirebase(task.id), className: "text-slate-400 text-xs px-1" }, "🗑️")
               ),
