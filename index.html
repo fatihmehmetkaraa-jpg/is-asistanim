@@ -48,6 +48,14 @@
     const e = React.createElement;
     const { useState, useEffect, useRef } = React;
 
+    // Güvenli Yerel Tarih (YYYY-MM-DD) Fonksiyonu
+    const getLocalDateISO = (dateObj = new Date()) => {
+      const year = dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
     // Resim Sıkıştırma
     const compressImage = (file, maxWidth = 800, quality = 0.7, callback) => {
       const reader = new FileReader();
@@ -107,7 +115,7 @@
     };
 
     function App() {
-      const todayISO = new Date().toISOString().split("T")[0];
+      const todayISO = getLocalDateISO();
 
       // Güvenlik & Oturum
       const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -115,7 +123,7 @@
       });
       const [inputPin, setInputPin] = useState("");
 
-      // Profil / Kişisel Bilgiler (WhatsApp "Siz" Ekranı)
+      // Profil / Kişisel Bilgiler
       const [profile, setProfile] = useState(() => {
         const saved = localStorage.getItem("user_profile");
         return saved ? JSON.parse(saved) : {
@@ -131,13 +139,13 @@
       const [bgPattern, setBgPattern] = useState(() => localStorage.getItem("app_bg") || "default");
       const [customBgUrl, setCustomBgUrl] = useState(() => localStorage.getItem("app_bg_custom") || "");
 
-      // Navigasyon (Tabs: 'daily' | 'meetings' | 'profile')
+      // Navigasyon (Tabs)
       const [activeTab, setActiveTab] = useState("daily");
       const [selectedDate, setSelectedDate] = useState(todayISO);
       const [selectedFolderId, setSelectedFolderId] = useState(null);
       const [selectedSessionId, setSelectedSessionId] = useState(null);
 
-      // Swipe (Dokunmatik Kaydırma)
+      // Swipe Kontrolleri
       const touchStartX = useRef(0);
       const touchEndX = useRef(0);
 
@@ -157,7 +165,7 @@
       const [taskAudioBlob, setTaskAudioBlob] = useState(null);
       const [meetingAudioBlob, setMeetingAudioBlob] = useState(null);
 
-      // Sesli Mod Kontrolleri
+      // Ses Kontrolleri
       const [speechTarget, setSpeechTarget] = useState(null);
       const [showAudioMenu, setShowAudioMenu] = useState(null);
       const [isLiveListening, setIsLiveListening] = useState(false);
@@ -187,14 +195,14 @@
 
       const [isSyncing, setIsSyncing] = useState(true);
 
-      // Tarih Listesi
+      // Dinamik Tarih Şeridi Üretici
       const generateDateList = () => {
         const dates = [];
         const base = new Date();
         for (let i = -3; i <= 7; i++) {
           const d = new Date(base);
           d.setDate(base.getDate() + i);
-          const iso = d.toISOString().split("T")[0];
+          const iso = getLocalDateISO(d);
           const dayName = d.toLocaleDateString("tr-TR", { weekday: "short" });
           const dayNum = d.getDate();
           dates.push({ iso, dayName, dayNum });
@@ -210,31 +218,28 @@
         localStorage.setItem("user_profile", JSON.stringify(newProf));
       };
 
-      // Tema Değişimi ve Kalıcılık
+      // Tema Kontrolü
       useEffect(() => {
         if (darkMode) document.documentElement.classList.add('dark');
         else document.documentElement.classList.remove('dark');
         localStorage.setItem("app_dark_mode", darkMode.toString());
       }, [darkMode]);
 
-      // Bildirim İzni İsteme
+      // Bildirim İzni
       useEffect(() => {
         if ("Notification" in window && Notification.permission !== "granted") {
           Notification.requestPermission();
         }
       }, []);
 
-      // Alarm ve Titreşim Kontrolcüsü
+      // Alarm & Titreşim
       useEffect(() => {
         const interval = setInterval(() => {
           const nowStr = new Date().toISOString().slice(0, 16);
           tasks.forEach(task => {
             if (task.alarmTime && task.alarmTime === nowStr && !task.completed && !task.alarmNotified) {
-              
               const type = task.alarmType || "both";
-              if (type === "sound" || type === "both") {
-                playAlarmSound();
-              }
+              if (type === "sound" || type === "both") playAlarmSound();
               if ((type === "vibrate" || type === "both") && "vibrate" in navigator) {
                 navigator.vibrate([300, 100, 300, 100, 500]);
               }
@@ -255,7 +260,7 @@
         return () => clearInterval(interval);
       }, [tasks, profile]);
 
-      // Firebase Senkronizasyonu
+      // Firebase Senkronizasyonu & Gün Devri (Düzeltildi)
       useEffect(() => {
         const checkDb = setInterval(() => {
           if (window.db && window.dbFuncs) {
@@ -265,9 +270,10 @@
             const unsubTasks = onSnapshot(collection(window.db, "tasks"), (snapshot) => {
               const loadedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
               
+              const currentTodayISO = getLocalDateISO();
               const updatedTasks = loadedTasks.map(task => {
-                if (!task.completed && task.date < todayISO) {
-                  const rolledTask = { ...task, date: todayISO, isRollover: true };
+                if (!task.completed && task.date < currentTodayISO) {
+                  const rolledTask = { ...task, date: currentTodayISO, isRollover: true };
                   saveTaskToFirebase(rolledTask);
                   return rolledTask;
                 }
@@ -275,7 +281,7 @@
               });
 
               setTasks(updatedTasks);
-              setIsSyncing(false);
+              setIsSyncing(false); // Veri çekildiği an yükleme ekranını kapat
             });
 
             const unsubTopics = onSnapshot(collection(window.db, "topics"), (snapshot) => {
@@ -285,15 +291,12 @@
 
             return () => { unsubTasks(); unsubTopics(); };
           }
-        }, 300);
+        }, 200);
         return () => clearInterval(checkDb);
       }, []);
 
-      // Touch Swipe (Sola/Sağa Kaydırma) Mantığı
-      const handleTouchStart = (e) => {
-        touchStartX.current = e.touches[0].clientX;
-      };
-
+      // Dokunmatik Kaydırma (Swipe)
+      const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
       const handleTouchEnd = (e) => {
         touchEndX.current = e.changedTouches[0].clientX;
         const diff = touchStartX.current - touchEndX.current;
@@ -309,7 +312,7 @@
         }
       };
 
-      // Oturum İşlemleri
+      // Oturum Yönetimi
       const handleAuthSubmit = () => {
         const storedPin = localStorage.getItem("app_pin");
         if (!storedPin) {
@@ -332,7 +335,6 @@
         setIsAuthenticated(false);
       };
 
-      // Tema Değişimi
       const handleBgChange = (type) => {
         setBgPattern(type);
         localStorage.setItem("app_bg", type);
@@ -374,7 +376,7 @@
         recognition.start();
       };
 
-      // Ses Kaydı (WebM Fix)
+      // Ses Kaydı
       const startAudioRecording = (target) => {
         stopAllAudioControls();
         setSpeechTarget(target);
@@ -447,15 +449,16 @@
       };
 
       // Görev Ekleme
-      const addTask = () => {
-        if (!newTaskTitle.trim() && !selectedTaskImage && !taskAudioBlob) return;
+      const addTask = (customTitle = null) => {
+        const titleToUse = typeof customTitle === "string" ? customTitle : newTaskTitle;
+        if (!titleToUse.trim() && !selectedTaskImage && !taskAudioBlob) return;
         
         const now = new Date();
         const formattedCreatedDate = `${now.toLocaleDateString('tr-TR')} ${now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
 
         const newTask = {
           id: Date.now().toString(),
-          title: newTaskTitle || "Sesli Görev / Görsel",
+          title: titleToUse || "Sesli Görev / Görsel",
           date: selectedDate,
           createdDate: formattedCreatedDate,
           completed: false,
@@ -550,7 +553,6 @@
         setMeetingAudioBlob(null);
       };
 
-      // Düzenlenen Ögeyi Kaydetme
       const saveEditedItem = () => {
         if (!editingItem) return;
         if (editingItem.type === "task") {
@@ -857,7 +859,7 @@
                   type: "date",
                   value: selectedDate,
                   onChange: (ev) => setSelectedDate(ev.target.value),
-                  className: "bg-white/20 text-white placeholder-white text-[10px] px-2 py-0.5 rounded-lg border border-white/30 outline-none"
+                  className: "bg-white/20 text-white placeholder-white text-[10px] px-2 py-0.5 rounded-lg border border-white/30 outline-none cursor-pointer"
                 })
               ),
               e("div", { className: "flex gap-1.5 overflow-x-auto pb-1 scrollbar-none" },
@@ -983,7 +985,7 @@
                 e("button", { onClick: () => setTaskAudioBlob(null), className: "text-rose-500 font-bold text-xs" }, "✕")
               ),
 
-              e("button", { onClick: addTask, className: "w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-bold shadow-xs" }, "Kaydet")
+              e("button", { onClick: () => addTask(), className: "w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-bold shadow-xs" }, "Kaydet")
             ),
 
             sortedTasks.map(task => e("div", { 
