@@ -48,7 +48,7 @@
     const e = React.createElement;
     const { useState, useEffect, useRef } = React;
 
-    // Güvenli Yerel Tarih (YYYY-MM-DD) Fonksiyonu
+    // Güvenli Yerel Tarih (YYYY-MM-DD)
     const getLocalDateISO = (dateObj = new Date()) => {
       const year = dateObj.getFullYear();
       const month = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -85,7 +85,7 @@
       };
     };
 
-    // Web Audio API ile Alarm Bip Sesi Üretici
+    // Alarm Bip Sesi
     const playAlarmSound = () => {
       try {
         const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -110,7 +110,7 @@
         playBeep(880, 0.2, 250);
         playBeep(1200, 0.4, 500);
       } catch(err) {
-        console.log("Ses çalma hatası:", err);
+        console.log("Ses hatası:", err);
       }
     };
 
@@ -123,7 +123,7 @@
       });
       const [inputPin, setInputPin] = useState("");
 
-      // Profil / Kişisel Bilgiler
+      // Profil
       const [profile, setProfile] = useState(() => {
         const saved = localStorage.getItem("user_profile");
         return saved ? JSON.parse(saved) : {
@@ -136,20 +136,22 @@
 
       // Tema ve Arka Plan
       const [darkMode, setDarkMode] = useState(() => localStorage.getItem("app_dark_mode") === "true");
-      const [bgPattern, setBgPattern] = useState(() => localStorage.getItem("app_bg") || "default");
+      const [bgStyleType, setBgStyleType] = useState(() => localStorage.getItem("app_bg_type") || "default");
       const [customBgUrl, setCustomBgUrl] = useState(() => localStorage.getItem("app_bg_custom") || "");
+      const [customBgColor, setCustomBgColor] = useState(() => localStorage.getItem("app_bg_color") || "#0f172a");
+      const [showThemeModal, setShowThemeModal] = useState(false);
 
-      // Navigasyon (Tabs)
+      // Navigasyon & Tarihler
       const [activeTab, setActiveTab] = useState("daily");
       const [selectedDate, setSelectedDate] = useState(todayISO);
       const [selectedFolderId, setSelectedFolderId] = useState(null);
       const [selectedSessionId, setSelectedSessionId] = useState(null);
 
-      // Swipe Kontrolleri
+      // Swipe
       const touchStartX = useRef(0);
       const touchEndX = useRef(0);
 
-      // Modallar
+      // Modallar & Önizleme
       const [previewImageUrl, setPreviewImageUrl] = useState(null);
       const [editingItem, setEditingItem] = useState(null);
 
@@ -195,7 +197,7 @@
 
       const [isSyncing, setIsSyncing] = useState(true);
 
-      // Dinamik Tarih Şeridi Üretici
+      // Tarih Şeridi
       const generateDateList = () => {
         const dates = [];
         const base = new Date();
@@ -212,27 +214,24 @@
 
       const dateList = generateDateList();
 
-      // Profil Kaydetme
       const saveProfile = (newProf) => {
         setProfile(newProf);
         localStorage.setItem("user_profile", JSON.stringify(newProf));
       };
 
-      // Tema Kontrolü
       useEffect(() => {
         if (darkMode) document.documentElement.classList.add('dark');
         else document.documentElement.classList.remove('dark');
         localStorage.setItem("app_dark_mode", darkMode.toString());
       }, [darkMode]);
 
-      // Bildirim İzni
       useEffect(() => {
         if ("Notification" in window && Notification.permission !== "granted") {
           Notification.requestPermission();
         }
       }, []);
 
-      // Alarm & Titreşim
+      // Alarm Zamanlayıcı
       useEffect(() => {
         const interval = setInterval(() => {
           const nowStr = new Date().toISOString().slice(0, 16);
@@ -260,7 +259,7 @@
         return () => clearInterval(interval);
       }, [tasks, profile]);
 
-      // Firebase Senkronizasyonu & Gün Devri (Düzeltildi)
+      // Firebase Senkronizasyonu
       useEffect(() => {
         const checkDb = setInterval(() => {
           if (window.db && window.dbFuncs) {
@@ -281,7 +280,7 @@
               });
 
               setTasks(updatedTasks);
-              setIsSyncing(false); // Veri çekildiği an yükleme ekranını kapat
+              setIsSyncing(false);
             });
 
             const unsubTopics = onSnapshot(collection(window.db, "topics"), (snapshot) => {
@@ -295,7 +294,6 @@
         return () => clearInterval(checkDb);
       }, []);
 
-      // Dokunmatik Kaydırma (Swipe)
       const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
       const handleTouchEnd = (e) => {
         touchEndX.current = e.changedTouches[0].clientX;
@@ -312,7 +310,6 @@
         }
       };
 
-      // Oturum Yönetimi
       const handleAuthSubmit = () => {
         const storedPin = localStorage.getItem("app_pin");
         if (!storedPin) {
@@ -335,12 +332,16 @@
         setIsAuthenticated(false);
       };
 
-      const handleBgChange = (type) => {
-        setBgPattern(type);
-        localStorage.setItem("app_bg", type);
+      const changeBgType = (type, color = null) => {
+        setBgStyleType(type);
+        localStorage.setItem("app_bg_type", type);
+        if (color) {
+          setCustomBgColor(color);
+          localStorage.setItem("app_bg_color", color);
+        }
       };
 
-      // Canlı Ses Tanıma
+      // Canlı Ses Dinleme
       const startLiveListening = (target) => {
         if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
           return alert("Tarayıcınız ses tanıma özelliğini desteklemiyor.");
@@ -429,7 +430,7 @@
         setShowAudioMenu(null);
       };
 
-      // Firebase İşlemleri
+      // Firebase Yardımcıları
       const saveTaskToFirebase = async (taskObj) => {
         if (!window.db) return;
         const { doc, setDoc } = window.dbFuncs;
@@ -474,6 +475,7 @@
           assignedTo: profile.fullName,
           isRollover: false
         };
+
         saveTaskToFirebase(newTask);
         setNewTaskTitle("");
         setNewTaskBgColor("#ffffff");
@@ -520,37 +522,49 @@
         });
       };
 
-      const addNoteToSession = (folderId, sessionId) => {
+      // Toplantı Notu Ekleme (DÜZELTİLDİ: Silinme/Kaybolma Hatası Engellendi)
+      const addNoteToSession = async (folderId, sessionId) => {
         if (!newNoteContent.trim() && !selectedMeetingImage && !meetingAudioBlob) return;
+        
         const folder = meetingTopics.find(f => f.id === folderId);
         if (!folder) return;
 
         const now = new Date();
         const formattedDate = `${now.toLocaleDateString('tr-TR')} ${now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
 
+        const newNoteItem = {
+          id: "n_" + Date.now(),
+          content: newNoteContent || "Ses Kaydı / Not",
+          assignee: newNoteAssignee || profile.fullName,
+          createdBy: profile.fullName,
+          image: selectedMeetingImage,
+          audio: meetingAudioBlob,
+          date: formattedDate
+        };
+
         const updatedSessions = (folder.sessions || []).map(sess => {
           if (sess.id === sessionId) {
             return {
               ...sess,
-              notes: [{
-                id: "n_" + Date.now(),
-                content: newNoteContent || "Ses Kaydı / Not",
-                assignee: newNoteAssignee || profile.fullName,
-                createdBy: profile.fullName,
-                image: selectedMeetingImage,
-                audio: meetingAudioBlob,
-                date: formattedDate
-              }, ...(sess.notes || [])]
+              notes: [newNoteItem, ...(sess.notes || [])]
             };
           }
           return sess;
         });
 
-        saveTopicToFirebase({ ...folder, sessions: updatedSessions });
+        const updatedFolder = { ...folder, sessions: updatedSessions };
+
+        // Local state'i öncelikle güvenle güncelle
+        setMeetingTopics(prev => prev.map(f => f.id === folderId ? updatedFolder : f));
+
+        // Form alanlarını sıfırla
         setNewNoteContent("");
         setNewNoteAssignee("");
         setSelectedMeetingImage(null);
         setMeetingAudioBlob(null);
+
+        // Firebase'e yaz
+        await saveTopicToFirebase(updatedFolder);
       };
 
       const saveEditedItem = () => {
@@ -639,32 +653,39 @@
         }
       };
 
+      // Gelişmiş Özgün Tema Stil Üretici
       const getBgStyle = () => {
-        if (bgPattern === "custom" && customBgUrl) {
+        if (bgStyleType === "custom" && customBgUrl) {
           return { backgroundImage: `url(${customBgUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' };
         }
-        if (bgPattern === "dots") {
-          return { backgroundImage: 'radial-gradient(circle, #cbd5e1 1px, transparent 1px)', backgroundSize: '16px 16px' };
+        if (bgStyleType === "solid") {
+          return { backgroundColor: customBgColor };
         }
-        if (bgPattern === "grid") {
-          return { backgroundImage: 'linear-gradient(to right, #e2e8f0 1px, transparent 1px), linear-gradient(to bottom, #e2e8f0 1px, transparent 1px)', backgroundSize: '20px 20px' };
+        if (bgStyleType === "dots") {
+          return { backgroundImage: 'radial-gradient(circle, #94a3b8 1px, transparent 1px)', backgroundSize: '16px 16px' };
         }
-        if (bgPattern === "whatsapp_dark") {
-          return { backgroundColor: '#0b141a', backgroundImage: 'radial-gradient(circle, #1f2c34 1px, transparent 1px)', backgroundSize: '18px 18px' };
+        if (bgStyleType === "grid") {
+          return { backgroundImage: 'linear-gradient(to right, #cbd5e1 1px, transparent 1px), linear-gradient(to bottom, #cbd5e1 1px, transparent 1px)', backgroundSize: '20px 20px' };
         }
-        if (bgPattern === "whatsapp_light") {
-          return { backgroundColor: '#efeae2', backgroundImage: 'radial-gradient(circle, #d1c7bd 1px, transparent 1px)', backgroundSize: '18px 18px' };
+        if (bgStyleType === "corporate_dark") {
+          return { backgroundColor: '#0f172a', backgroundImage: 'radial-gradient(circle, #1e293b 1px, transparent 1px)', backgroundSize: '18px 18px' };
+        }
+        if (bgStyleType === "soft_cream") {
+          return { backgroundColor: '#f8f5ee', backgroundImage: 'radial-gradient(circle, #e2d9cc 1px, transparent 1px)', backgroundSize: '18px 18px' };
+        }
+        if (bgStyleType === "midnight_blue") {
+          return { backgroundColor: '#090d16', backgroundImage: 'linear-gradient(to right, #111827 1px, transparent 1px), linear-gradient(to bottom, #111827 1px, transparent 1px)', backgroundSize: '24px 24px' };
         }
         return {};
       };
 
       const softColors = [
-        { name: "Varsayılan", code: "#ffffff" },
-        { name: "Soft Pembe", code: "#ffe5ec" },
-        { name: "Soft Yeşil", code: "#e8f5e9" },
-        { name: "Soft Mavi", code: "#e3f2fd" },
-        { name: "Soft Sarı", code: "#fffde7" },
-        { name: "Soft Mor", code: "#f3e5f5" }
+        { name: "Beyaz", code: "#ffffff" },
+        { name: "Pembe", code: "#ffe5ec" },
+        { name: "Yeşil", code: "#e8f5e9" },
+        { name: "Mavi", code: "#e3f2fd" },
+        { name: "Sarı", code: "#fffde7" },
+        { name: "Mor", code: "#f3e5f5" }
       ];
 
       /* ---------------- GİRİŞ / KİLİT EKRANI ---------------- */
@@ -691,7 +712,7 @@
         );
       }
 
-      /* ---------------- ANA UYGULAMA ARAYÜZÜ ---------------- */
+      /* ---------------- ANA UYGULAMA EKRANI ---------------- */
       return e("div", { 
         style: getBgStyle(),
         onTouchStart: handleTouchStart,
@@ -705,6 +726,75 @@
           e("div", { className: "bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col items-center gap-3" },
             e("div", { className: "w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" }),
             e("span", { className: "text-xs font-bold text-slate-700 dark:text-slate-200" }, "Veriler eşitleniyor...")
+          )
+        ),
+
+        /* ÖZGÜN TEMA MODALI (AÇILIR PENCERE) */
+        showThemeModal && e("div", {
+          className: "fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+        },
+          e("div", { className: "w-full max-w-sm bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto" },
+            e("div", { className: "flex items-center justify-between border-b pb-2 dark:border-slate-800" },
+              e("h3", { className: "font-black text-sm text-slate-900 dark:text-white" }, "🎨 Görünüm & Tema Stilleri"),
+              e("button", { onClick: () => setShowThemeModal(false), className: "text-slate-400 font-bold text-sm px-2" }, "✕")
+            ),
+
+            e("div", { className: "space-y-3" },
+              e("div", { className: "space-y-1.5" },
+                e("label", { className: "text-[11px] font-bold text-slate-500 block" }, "Sınırsız Arka Plan Rengi"),
+                e("div", { className: "flex items-center gap-2" },
+                  e("input", {
+                    type: "color",
+                    value: customBgColor,
+                    onChange: (ev) => changeBgType("solid", ev.target.value),
+                    className: "w-10 h-10 rounded-xl cursor-pointer border-0 bg-transparent"
+                  }),
+                  e("span", { className: "text-xs font-semibold text-slate-600 dark:text-slate-300" }, "İstediğiniz Özel Rengi Seçin")
+                )
+              ),
+
+              e("div", { className: "space-y-1.5" },
+                e("label", { className: "text-[11px] font-bold text-slate-500 block" }, "Hazır Stil Katalogları"),
+                e("div", { className: "grid grid-cols-2 gap-2 text-xs font-bold" },
+                  e("button", {
+                    onClick: () => changeBgType("default"),
+                    className: `p-2.5 rounded-xl border text-left flex items-center justify-between ${bgStyleType === "default" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : "dark:border-slate-800"}`
+                  }, "Açık Minimal", "☀️"),
+
+                  e("button", {
+                    onClick: () => changeBgType("corporate_dark"),
+                    className: `p-2.5 rounded-xl border text-left flex items-center justify-between ${bgStyleType === "corporate_dark" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : "dark:border-slate-800"}`
+                  }, "Kurumsal Gece", "🌙"),
+
+                  e("button", {
+                    onClick: () => changeBgType("soft_cream"),
+                    className: `p-2.5 rounded-xl border text-left flex items-center justify-between ${bgStyleType === "soft_cream" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : "dark:border-slate-800"}`
+                  }, "Soft Krem", "📜"),
+
+                  e("button", {
+                    onClick: () => changeBgType("midnight_blue"),
+                    className: `p-2.5 rounded-xl border text-left flex items-center justify-between ${bgStyleType === "midnight_blue" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : "dark:border-slate-800"}`
+                  }, "Gece Mavisi", "🌌"),
+
+                  e("button", {
+                    onClick: () => changeBgType("dots"),
+                    className: `p-2.5 rounded-xl border text-left flex items-center justify-between ${bgStyleType === "dots" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : "dark:border-slate-800"}`
+                  }, "Noktalı Doku", "💬"),
+
+                  e("button", {
+                    onClick: () => changeBgType("grid"),
+                    className: `p-2.5 rounded-xl border text-left flex items-center justify-between ${bgStyleType === "grid" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : "dark:border-slate-800"}`
+                  }, "Izgara Matris", "📐")
+                )
+              ),
+
+              e("div", { className: "pt-2 border-t dark:border-slate-800" },
+                e("button", {
+                  onClick: () => bgFileInputRef.current && bgFileInputRef.current.click(),
+                  className: "w-full py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black shadow-md flex items-center justify-center gap-2"
+                }, "🖼️ Özel Resim / Duvar Kağıdı Yükle")
+              )
+            )
           )
         ),
 
@@ -814,7 +904,7 @@
               compressImage(file, 1200, 0.6, (base64) => {
                 setCustomBgUrl(base64);
                 localStorage.setItem("app_bg_custom", base64);
-                handleBgChange("custom");
+                changeBgType("custom");
               });
             }
           },
@@ -849,7 +939,7 @@
 
         e("main", { className: "p-3 space-y-3" },
 
-          /* ---------------- 1. GÜNLÜK GÖREVLER EKRANI ---------------- */
+          /* ---------------- 1. GÜNLÜK GÖREVLER ---------------- */
           activeTab === "daily" && e("div", { className: "space-y-3" },
             
             e("div", { className: "bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-3 rounded-2xl shadow-md space-y-2" },
@@ -859,7 +949,7 @@
                   type: "date",
                   value: selectedDate,
                   onChange: (ev) => setSelectedDate(ev.target.value),
-                  className: "bg-white/20 text-white placeholder-white text-[10px] px-2 py-0.5 rounded-lg border border-white/30 outline-none cursor-pointer"
+                  className: "bg-white/20 text-white text-[10px] px-2 py-0.5 rounded-lg border border-white/30 outline-none cursor-pointer"
                 })
               ),
               e("div", { className: "flex gap-1.5 overflow-x-auto pb-1 scrollbar-none" },
@@ -988,7 +1078,8 @@
               e("button", { onClick: () => addTask(), className: "w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-bold shadow-xs" }, "Kaydet")
             ),
 
-            sortedTasks.map(task => e("div", { 
+            /* SADELEŞTİRME DÜZELTMESİ: Görev ekleme alanı (showAddForm) kapalıyken görev listesi gösterilir */
+            !showAddForm && sortedTasks.map(task => e("div", { 
               key: task.id, 
               style: task.bgColor && task.bgColor !== "#ffffff" ? { backgroundColor: task.bgColor, color: "#1e293b" } : {},
               className: `p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col gap-2 shadow-xs ${!task.bgColor || task.bgColor === "#ffffff" ? "bg-white/95 dark:bg-slate-900/95" : ""}` 
@@ -1217,7 +1308,7 @@
             )
           ),
 
-          /* ---------------- 3. "SİZ" EKRANI ---------------- */
+          /* ---------------- 3. "SİZ" (PROFİL) ---------------- */
           activeTab === "profile" && e("div", { className: "space-y-4 animate-fadeIn" },
             
             e("div", { className: "p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4" },
@@ -1271,35 +1362,16 @@
               )
             ),
 
-            e("div", { className: "p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-3" },
-              e("h4", { className: "font-black text-xs text-slate-800 dark:text-slate-200 flex items-center gap-1.5" }, "🎨 WhatsApp Tarzı Temalar"),
-              
-              e("div", { className: "grid grid-cols-3 gap-2 text-[10px] font-bold" },
-                e("button", { 
-                  onClick: () => handleBgChange("default"), 
-                  className: `p-2.5 rounded-xl border text-center ${bgPattern === "default" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : ""}` 
-                }, "Açık Tema"),
-                e("button", { 
-                  onClick: () => handleBgChange("whatsapp_dark"), 
-                  className: `p-2.5 rounded-xl border text-center ${bgPattern === "whatsapp_dark" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : ""}` 
-                }, "WhatsApp Koyu"),
-                e("button", { 
-                  onClick: () => handleBgChange("whatsapp_light"), 
-                  className: `p-2.5 rounded-xl border text-center ${bgPattern === "whatsapp_light" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : ""}` 
-                }, "WhatsApp Krem"),
-                e("button", { 
-                  onClick: () => handleBgChange("dots"), 
-                  className: `p-2.5 rounded-xl border text-center ${bgPattern === "dots" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : ""}` 
-                }, "Noktalı"),
-                e("button", { 
-                  onClick: () => handleBgChange("grid"), 
-                  className: `p-2.5 rounded-xl border text-center ${bgPattern === "grid" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : ""}` 
-                }, "Izgara"),
-                e("button", { 
-                  onClick: () => bgFileInputRef.current && bgFileInputRef.current.click(), 
-                  className: `p-2.5 rounded-xl border text-center ${bgPattern === "custom" ? "border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-600" : ""}` 
-                }, "🖼️ Görsel Yükle")
-              )
+            /* YENİ MODAL TETİKLEYİCİ TEMA BUTONU */
+            e("div", { className: "p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between" },
+              e("div", null,
+                e("h4", { className: "font-black text-xs text-slate-800 dark:text-slate-200" }, "🎨 Görünüm & Tema Stilleri"),
+                e("p", { className: "text-[10px] text-slate-400 font-medium" }, "Renk Paleti, Stil Kataloğu & Özel Duvar Kağıdı")
+              ),
+              e("button", {
+                onClick: () => setShowThemeModal(true),
+                className: "px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black shadow-md flex items-center gap-1.5"
+              }, "Temaları Aç ➔")
             ),
 
             e("div", { className: "p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between" },
@@ -1315,7 +1387,7 @@
           )
         ),
 
-        /* ---------------- ALT NAVİGASYON BAR ---------------- */
+        /* NAVİGASYON BAR */
         e("nav", { className: "fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 flex items-center justify-around py-2 z-40 shadow-2xl" },
           
           e("button", {
