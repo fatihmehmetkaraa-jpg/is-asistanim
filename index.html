@@ -269,7 +269,7 @@
         return () => clearInterval(interval);
       }, [tasks, profile]);
 
-      // Firebase Senkronizasyonu (Düzeltilmiş Abonelik Temizleme Mekanizması)
+      // Firebase Senkronizasyonu
       useEffect(() => {
         let unsubTasks, unsubTopics, unsubNotes;
 
@@ -455,7 +455,7 @@
         setShowAudioMenu(null);
       };
 
-      // Firebase Yardımcıları
+      // Firebase İşlemleri (Silme fonksiyonu düzeltildi)
       const saveTaskToFirebase = async (taskObj) => {
         if (!window.db) return;
         const { doc, setDoc } = window.dbFuncs;
@@ -486,7 +486,7 @@
         await deleteDoc(doc(window.db, "notes", id));
       };
 
-      // iOS NOTLARI KAYDETME MANTIĞI
+      // iOS NOTLARI KAYDETME
       const handleSaveIosNote = () => {
         if (!newIosNoteTitle.trim() && !newIosNoteBody.trim()) {
           setIsEditingNote(false);
