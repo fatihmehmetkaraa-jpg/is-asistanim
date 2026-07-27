@@ -48,7 +48,6 @@
     const e = React.createElement;
     const { useState, useEffect, useRef } = React;
 
-    // Yerel Tarih Formatı (YYYY-MM-DD)
     const getLocalDateISO = (dateObj = new Date()) => {
       const year = dateObj.getFullYear();
       const month = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -56,7 +55,6 @@
       return `${year}-${month}-${day}`;
     };
 
-    // Görsel Sıkıştırma
     const compressImage = (file, maxWidth = 800, quality = 0.7, callback) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -85,7 +83,6 @@
       };
     };
 
-    // Alarm Bip Sesi
     const playAlarmSound = () => {
       try {
         const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -117,13 +114,11 @@
     function App() {
       const todayISO = getLocalDateISO();
 
-      // Güvenlik & Oturum
       const [isAuthenticated, setIsAuthenticated] = useState(() => {
         return localStorage.getItem("app_authenticated") === "true";
       });
       const [inputPin, setInputPin] = useState("");
 
-      // Profil
       const [profile, setProfile] = useState(() => {
         const saved = localStorage.getItem("user_profile");
         return saved ? JSON.parse(saved) : {
@@ -134,20 +129,17 @@
         };
       });
 
-      // Tema ve Arka Plan
       const [darkMode, setDarkMode] = useState(() => localStorage.getItem("app_dark_mode") === "true");
       const [bgStyleType, setBgStyleType] = useState(() => localStorage.getItem("app_bg_type") || "default");
       const [customBgUrl, setCustomBgUrl] = useState(() => localStorage.getItem("app_bg_custom") || "");
       const [customBgColor, setCustomBgColor] = useState(() => localStorage.getItem("app_bg_color") || "#0f172a");
       const [showThemeModal, setShowThemeModal] = useState(false);
 
-      // Navigasyon & Tarihler
       const [activeTab, setActiveTab] = useState("daily");
       const [selectedDate, setSelectedDate] = useState(todayISO);
       const [selectedFolderId, setSelectedFolderId] = useState(null);
       const [selectedSessionId, setSelectedSessionId] = useState(null);
 
-      // iOS NOTLAR EKLENTİLERİ VE ZENGİN METİN ARAÇ BARI DURUMLARI
       const [notes, setNotes] = useState([]);
       const [noteSearchQuery, setNoteSearchQuery] = useState("");
       const [selectedNote, setSelectedNote] = useState(null);
@@ -158,29 +150,23 @@
       const [showNoteOptionsMenu, setShowNoteOptionsMenu] = useState(false);
       const noteFileInputRef = useRef(null);
 
-      // Apple Toolbar Menü Durumları
-      const [activeToolbarMenu, setActiveToolbarMenu] = useState(null); // 'textStyle', 'alignment', 'more'
+      const [activeToolbarMenu, setActiveToolbarMenu] = useState(null);
       const [activeTextStyle, setActiveTextStyle] = useState("Gövde");
-      const [textAlignment, setTextAlignment] = useState("left"); // left, center, right, justify
-      const [highlightColor, setHighlightColor] = useState(null);
       const editorAreaRef = useRef(null);
 
-      // CANVAS (ÇİZİM) MODALI
+      // CANVAS (ÇİZİM)
       const [showCanvasModal, setShowCanvasModal] = useState(false);
       const [canvasColor, setCanvasColor] = useState("#000000");
       const [canvasLineWidth, setCanvasLineWidth] = useState(3);
       const [isDrawing, setIsDrawing] = useState(false);
       const canvasRef = useRef(null);
 
-      // Swipe Kontrolü
       const touchStartX = useRef(0);
       const touchEndX = useRef(0);
 
-      // Modallar & Önizlemeler
       const [previewImageUrl, setPreviewImageUrl] = useState(null);
       const [editingItem, setEditingItem] = useState(null);
 
-      // Medya Referansları
       const taskFileInputRef = useRef(null);
       const meetingFileInputRef = useRef(null);
       const bgFileInputRef = useRef(null);
@@ -192,7 +178,6 @@
       const [taskAudioBlob, setTaskAudioBlob] = useState(null);
       const [meetingAudioBlob, setMeetingAudioBlob] = useState(null);
 
-      // Ses Kontrolleri
       const [speechTarget, setSpeechTarget] = useState(null);
       const [showAudioMenu, setShowAudioMenu] = useState(null);
       const [isLiveListening, setIsLiveListening] = useState(false);
@@ -202,11 +187,9 @@
       const mediaRecorderRef = useRef(null);
       const audioChunksRef = useRef([]);
 
-      // Veri Depoları
       const [tasks, setTasks] = useState([]);
       const [meetingTopics, setMeetingTopics] = useState([]);
 
-      // Form Yönetimi
       const [showAddForm, setShowAddForm] = useState(false);
       const [newTaskTitle, setNewTaskTitle] = useState("");
       const [newTaskPriority, setNewTaskPriority] = useState("Yüksek");
@@ -222,7 +205,6 @@
 
       const [isSyncing, setIsSyncing] = useState(true);
 
-      // Tarih Şeridi
       const generateDateList = () => {
         const dates = [];
         const base = new Date();
@@ -256,7 +238,6 @@
         }
       }, []);
 
-      // Alarm Zamanlayıcı
       useEffect(() => {
         const interval = setInterval(() => {
           const nowStr = new Date().toISOString().slice(0, 16);
@@ -284,7 +265,6 @@
         return () => clearInterval(interval);
       }, [tasks, profile]);
 
-      // Firebase Dinleyicileri
       useEffect(() => {
         let unsubTasks, unsubTopics, unsubNotes;
 
@@ -379,7 +359,6 @@
         }
       };
 
-      // Canlı Ses Tanıma
       const startLiveListening = (target) => {
         if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
           return alert("Tarayıcınız ses tanıma özelliğini desteklemiyor.");
@@ -417,7 +396,6 @@
         recognition.start();
       };
 
-      // Ses Kaydı
       const startAudioRecording = (target) => {
         stopAllAudioControls();
         setSpeechTarget(target);
@@ -470,7 +448,6 @@
         setShowAudioMenu(null);
       };
 
-      // Firestore CRUD İşlemleri
       const saveTaskToFirebase = async (taskObj) => {
         if (!window.db) return;
         const { doc, setDoc } = window.dbFuncs;
@@ -501,7 +478,6 @@
         await deleteDoc(doc(window.db, "notes", id));
       };
 
-      // ZENGİN METİN (RICH TEXT) BİÇİMLENDİRME YARDIMCILARI
       const executeFormatCommand = (command, value = null) => {
         document.execCommand(command, false, value);
       };
@@ -523,14 +499,14 @@
         if (url) executeFormatCommand("createLink", url);
       };
 
-      // iOS NOTLARI KAYDETME
       const handleSaveIosNote = () => {
         let bodyContent = newIosNoteBody;
         if (editorAreaRef.current) {
           bodyContent = editorAreaRef.current.innerHTML;
         }
 
-        const plainText = editorAreaRef.current ? editorAreaRef.current.innerText : newIosNoteBody;
+        let plainText = editorAreaRef.current ? editorAreaRef.current.innerText : newIosNoteBody;
+        if (plainText === "Notunuzu buraya yazın...") plainText = "";
 
         if (!newIosNoteTitle.trim() && !plainText.trim()) {
           setIsEditingNote(false);
@@ -558,7 +534,6 @@
         setNoteImage(null);
       };
 
-      // NOT PAYLAŞMA
       const handleShareNote = () => {
         const plainText = editorAreaRef.current ? editorAreaRef.current.innerText : newIosNoteBody;
         const textToShare = `${newIosNoteTitle}\n\n${plainText}`;
@@ -573,42 +548,59 @@
         }
       };
 
-      // CANVAS ÇİZİM FONKSİYONLARI
+      // HASSAS CANVAS KORDİNAT HESAPLAMALARI DÜZELTİLDİ
+      const getCanvasCoordinates = (evt) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return { x: 0, y: 0 };
+        const rect = canvas.getBoundingClientRect();
+        const clientX = evt.clientX || (evt.touches && evt.touches[0] ? evt.touches[0].clientX : 0);
+        const clientY = evt.clientY || (evt.touches && evt.touches[0] ? evt.touches[0].clientY : 0);
+
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+
+        return {
+          x: (clientX - rect.left) * scaleX,
+          y: (clientY - rect.top) * scaleY
+        };
+      };
+
       const startDrawingOnCanvas = (evt) => {
+        if (evt.type === 'touchstart') evt.preventDefault();
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext("2d");
-        const rect = canvas.getBoundingClientRect();
-        const clientX = evt.clientX || (evt.touches && evt.touches[0].clientX);
-        const clientY = evt.clientY || (evt.touches && evt.touches[0].clientY);
-        
+        const { x, y } = getCanvasCoordinates(evt);
+
         ctx.beginPath();
-        ctx.moveTo(clientX - rect.left, clientY - rect.top);
+        ctx.moveTo(x, y);
         setIsDrawing(true);
       };
 
       const drawOnCanvas = (evt) => {
         if (!isDrawing) return;
+        if (evt.type === 'touchmove') evt.preventDefault();
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext("2d");
-        const rect = canvas.getBoundingClientRect();
-        const clientX = evt.clientX || (evt.touches && evt.touches[0].clientX);
-        const clientY = evt.clientY || (evt.touches && evt.touches[0].clientY);
+        const { x, y } = getCanvasCoordinates(evt);
 
         ctx.strokeStyle = canvasColor;
         ctx.lineWidth = canvasLineWidth;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
-        ctx.lineTo(clientX - rect.left, clientY - rect.top);
+        ctx.lineTo(x, y);
         ctx.stroke();
       };
 
-      const stopDrawingOnCanvas = () => {
+      const stopDrawingOnCanvas = (evt) => {
+        if (evt && evt.type === 'touchend') evt.preventDefault();
         setIsDrawing(false);
       };
 
-      const saveCanvasDrawingToNote = () => {
+      // DÜZELTME: Çizimi Doğrudan Not Sayfasına Ekler ve Sayfadan Çıkmaz
+      const saveCanvasDrawingToNote = (e) => {
+        if(e) e.preventDefault();
         const canvas = canvasRef.current;
         if (canvas) {
           const drawnBase64 = canvas.toDataURL("image/png");
@@ -617,7 +609,6 @@
         }
       };
 
-      // Görev Ekleme
       const addTask = (customTitle = null) => {
         const titleToUse = typeof customTitle === "string" ? customTitle : newTaskTitle;
         if (!titleToUse.trim() && !selectedTaskImage && !taskAudioBlob) return;
@@ -690,7 +681,6 @@
         });
       };
 
-      // Toplantı Notu Ekleme
       const addNoteToSession = async (folderId, sessionId) => {
         if (!newNoteContent.trim() && !selectedMeetingImage && !meetingAudioBlob) return;
         
@@ -854,7 +844,6 @@
         { name: "Mor", code: "#f3e5f5" }
       ];
 
-      // iOS NOTLAR TARİH GRUPLAMA YARDIMCISI
       const getGroupedNotes = () => {
         const filtered = notes.filter(n => {
           const titleMatch = n.title && n.title.toLowerCase().includes(noteSearchQuery.toLowerCase());
@@ -884,7 +873,6 @@
         return groups;
       };
 
-      /* ---------------- GİRİŞ / KİLİT EKRANI ---------------- */
       if (!isAuthenticated) {
         return e("div", { className: "min-h-screen flex items-center justify-center p-4 bg-slate-900 text-white" },
           e("div", { className: "w-full max-w-sm bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-2xl space-y-4 text-center" },
@@ -908,7 +896,6 @@
         );
       }
 
-      /* ---------------- ANA UYGULAMA EKRANI ---------------- */
       return e("div", { 
         style: getBgStyle(),
         onTouchStart: handleTouchStart,
@@ -925,7 +912,6 @@
           )
         ),
 
-        /* TEMA MODALI */
         showThemeModal && e("div", {
           className: "fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
         },
@@ -994,7 +980,7 @@
           )
         ),
 
-        /* CANVAS (ÇİZİM / KALEM) MODALI */
+        /* HASSAS VE DÜZELTİLMİŞ CANVAS MODALI */
         showCanvasModal && e("div", {
           className: "fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col justify-between p-4"
         },
@@ -1021,7 +1007,7 @@
               onTouchStart: startDrawingOnCanvas,
               onTouchMove: drawOnCanvas,
               onTouchEnd: stopDrawingOnCanvas,
-              className: "w-full h-full bg-white cursor-crosshair"
+              className: "w-full h-full bg-white cursor-crosshair touch-none"
             })
           ),
 
@@ -1200,7 +1186,7 @@
 
         e("main", { className: "p-3 space-y-3" },
 
-          /* ---------------- 1. GÜNLÜK GÖREVLER ---------------- */
+          /* 1. GÜNLÜK GÖREVLER */
           activeTab === "daily" && e("div", { className: "space-y-3" },
             
             e("div", { className: "bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-3 rounded-2xl shadow-md space-y-2" },
@@ -1380,7 +1366,7 @@
             ))
           ),
 
-          /* ---------------- 2. TOPLANTI KONULARI ---------------- */
+          /* 2. TOPLANTI KONULARI */
           activeTab === "meetings" && e("div", { className: "space-y-3" },
 
             !selectedFolderId && e("div", { className: "space-y-3" },
@@ -1568,13 +1554,11 @@
             )
           ),
 
-          /* ---------------- 3. NOTLARIM (iOS GELİŞMİŞ EDİTÖR) ---------------- */
+          /* 3. NOTLARIM (DÜZELTİLMİŞ EDİTÖR) */
           activeTab === "notes" && e("div", { className: "space-y-3 pb-24 animate-fadeIn" },
             
-            /* DÜZENLEME / YENİ NOT EKRANI */
             isEditingNote ? e("div", { className: "bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-3xl p-4 space-y-3 border border-slate-200 dark:border-slate-800 shadow-xl min-h-[78vh] flex flex-col justify-between" },
               e("div", { className: "space-y-3" },
-                /* Üst Navigasyon Barı */
                 e("div", { className: "flex items-center justify-between border-b pb-2 dark:border-slate-800" },
                   e("button", {
                     onClick: handleSaveIosNote,
@@ -1613,7 +1597,6 @@
                   }, "📋 Metni Kopyala")
                 ),
 
-                /* Başlık Metin Alanı */
                 e("input", {
                   type: "text",
                   placeholder: "Başlık",
@@ -1622,11 +1605,21 @@
                   className: "w-full bg-transparent text-xl font-black text-slate-900 dark:text-white outline-none placeholder-slate-400"
                 }),
 
-                /* Zengin Metin Alanı (ContentEditable) */
+                /* OTO SİLİNEN PLACEHOLDER METNİ DÜZELTMESİ */
                 e("div", {
                   ref: editorAreaRef,
                   contentEditable: true,
                   suppressContentEditableWarning: true,
+                  onFocus: (ev) => {
+                    if (ev.target.innerText.trim() === "Notunuzu buraya yazın...") {
+                      ev.target.innerText = "";
+                    }
+                  },
+                  onBlur: (ev) => {
+                    if (ev.target.innerText.trim() === "") {
+                      ev.target.innerText = "Notunuzu buraya yazın...";
+                    }
+                  },
                   dangerouslySetInnerHTML: { __html: newIosNoteBody || "Notunuzu buraya yazın..." },
                   className: "w-full min-h-[220px] bg-transparent text-sm font-medium text-slate-700 dark:text-slate-200 outline-none resize-none leading-relaxed overflow-y-auto"
                 }),
@@ -1637,10 +1630,7 @@
                 )
               ),
 
-              /* APPLE NOTLAR DÜZENLEME ARAÇ ÇUBUĞU (GÖRSELLERDEN AKTARILAN TÜM ARAÇLAR) */
               e("div", { className: "border-t pt-2 dark:border-slate-800 space-y-2" },
-                
-                /* Alt Menüler Açılır Paneli */
                 activeToolbarMenu === "textStyle" && e("div", { className: "bg-slate-100 dark:bg-slate-800 p-2 rounded-2xl flex items-center justify-between text-xs font-bold gap-1 border border-slate-200 dark:border-slate-700 animate-fadeIn" },
                   ["Başlık", "Alt Başlık", "Gövde", "Monospaced"].map(style => e("button", {
                     key: style,
@@ -1663,83 +1653,69 @@
                   e("button", { onClick: () => { executeFormatCommand("outdent"); setActiveToolbarMenu(null); } }, "⬅️ Girinti Azalt")
                 ),
 
-                /* Görsellerdeki İkonik Araç Çubuğu */
                 e("div", { className: "bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-2xl flex items-center justify-between border border-slate-200 dark:border-slate-700 shadow-sm" },
                   
-                  /* Aa Metin Stili */
                   e("button", {
                     onClick: () => setActiveToolbarMenu(activeToolbarMenu === "textStyle" ? null : "textStyle"),
                     className: "text-slate-700 dark:text-slate-200 font-black text-sm hover:text-amber-500"
                   }, "Aa"),
 
-                  /* Kalın (B) */
                   e("button", {
                     onClick: () => executeFormatCommand("bold"),
                     className: "text-slate-700 dark:text-slate-200 font-black text-sm hover:text-amber-500"
                   }, "B"),
 
-                  /* İtalik (I) */
                   e("button", {
                     onClick: () => executeFormatCommand("italic"),
                     className: "text-slate-700 dark:text-slate-200 italic font-bold text-sm hover:text-amber-500"
                   }, "I"),
 
-                  /* Altı Çizili (U) */
                   e("button", {
                     onClick: () => executeFormatCommand("underline"),
                     className: "text-slate-700 dark:text-slate-200 underline font-bold text-sm hover:text-amber-500"
                   }, "U"),
 
-                  /* Üstü Çizili (S) */
                   e("button", {
                     onClick: () => executeFormatCommand("strikeThrough"),
                     className: "text-slate-700 dark:text-slate-200 line-through font-bold text-sm hover:text-amber-500"
                   }, "S"),
 
-                  /* Vurgu Kalemi */
                   e("button", {
                     onClick: () => executeFormatCommand("backColor", "#fef08a"),
                     className: "text-slate-700 dark:text-slate-200 hover:text-amber-500 text-sm"
                   }, "✏️"),
 
-                  /* Hizalama ve Girinti Menüsü */
                   e("button", {
                     onClick: () => setActiveToolbarMenu(activeToolbarMenu === "alignment" ? null : "alignment"),
                     className: "text-slate-700 dark:text-slate-200 hover:text-amber-500 text-sm"
                   }, "≡"),
 
-                  /* Yapılacaklar (Checklist) */
                   e("button", {
                     onClick: () => executeFormatCommand("insertUnorderedList"),
                     className: "text-slate-700 dark:text-slate-200 hover:text-amber-500 text-sm font-bold"
                   }, "☑️"),
 
-                  /* Tablo Ekleme */
                   e("button", {
                     onClick: insertTableIntoNote,
                     className: "text-slate-700 dark:text-slate-200 hover:text-amber-500 text-sm"
                   }, "▦"),
 
-                  /* Bağlantı (URL) */
                   e("button", {
                     onClick: addLinkToNote,
                     className: "text-slate-700 dark:text-slate-200 hover:text-amber-500 text-sm"
                   }, "🔗"),
 
-                  /* Dosya / Medya Ekleme */
                   e("button", {
                     onClick: () => noteFileInputRef.current && noteFileInputRef.current.click(),
                     className: "text-slate-700 dark:text-slate-200 hover:text-amber-500 text-sm"
                   }, "📎"),
 
-                  /* Çizim Tuvali */
                   e("button", {
                     onClick: () => setShowCanvasModal(true),
                     className: "text-slate-700 dark:text-slate-200 hover:text-amber-500 text-sm"
                   }, "✍️")
                 ),
 
-                /* Onay ve Kaydetme Butonu */
                 e("button", {
                   onClick: handleSaveIosNote,
                   className: "w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-2xl font-black text-sm flex items-center justify-center shadow-lg active:scale-95"
@@ -1747,7 +1723,6 @@
               )
             ) :
 
-            /* ANA NOT LİSTESİ EKRANI */
             e("div", { className: "space-y-3" },
               
               e("div", { className: "flex items-center justify-between px-1" },
@@ -1825,7 +1800,6 @@
                 );
               }),
 
-              /* ARAMA VE YENİ NOT OLUŞTURMA BARI */
               e("div", { className: "fixed bottom-16 left-0 right-0 max-w-md mx-auto px-4 z-30" },
                 e("div", { className: "bg-slate-900/90 backdrop-blur-md p-1.5 rounded-full border border-slate-800 flex items-center gap-2 shadow-2xl" },
                   e("div", { className: "flex-1 flex items-center bg-slate-800/90 rounded-full px-3 py-1.5 gap-2 border border-slate-700/50" },
@@ -1858,7 +1832,7 @@
             )
           ),
 
-          /* ---------------- 4. "SİZ" (PROFİL) ---------------- */
+          /* 4. PROFİL */
           activeTab === "profile" && e("div", { className: "space-y-4 animate-fadeIn" },
             
             e("div", { className: "p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4" },
@@ -1936,7 +1910,7 @@
           )
         ),
 
-        /* ALT NAVİGASYON BAR (4 SEKMELİ) */
+        /* ALT NAVİGASYON BAR */
         e("nav", { className: "fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 flex items-center justify-around py-2 z-40 shadow-2xl" },
           
           e("button", {
