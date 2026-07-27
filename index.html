@@ -120,13 +120,22 @@
       const [inputPin, setInputPin] = useState("");
 
       const [profile, setProfile] = useState(() => {
-        const saved = localStorage.getItem("user_profile");
-        return saved ? JSON.parse(saved) : {
-          fullName: "Yönetici Kullanıcı",
-          email: "admin@sirket.com",
-          phone: "+90 555 000 0000",
-          avatar: null
-        };
+        try {
+          const saved = localStorage.getItem("user_profile");
+          return saved ? JSON.parse(saved) : {
+            fullName: "Yönetici Kullanıcı",
+            email: "admin@sirket.com",
+            phone: "+90 555 000 0000",
+            avatar: null
+          };
+        } catch(err) {
+          return {
+            fullName: "Yönetici Kullanıcı",
+            email: "admin@sirket.com",
+            phone: "+90 555 000 0000",
+            avatar: null
+          };
+        }
       });
 
       const [darkMode, setDarkMode] = useState(() => localStorage.getItem("app_dark_mode") === "true");
@@ -162,6 +171,7 @@
       const [canvasColor, setCanvasColor] = useState("#000000");
       const [canvasLineWidth, setCanvasLineWidth] = useState(3);
       const [isDrawing, setIsDrawing] = useState(false);
+      const isDrawingRef = useRef(false);
       const canvasRef = useRef(null);
 
       const touchStartX = useRef(0);
@@ -240,6 +250,23 @@
           Notification.requestPermission();
         }
       }, []);
+
+      // Editör açıldığında içeriği kontrollü şekilde yükle
+      useEffect(() => {
+        if (isEditingNote && editorAreaRef.current) {
+          editorAreaRef.current.innerHTML = newIosNoteBody || "";
+        }
+      }, [isEditingNote, selectedNote]);
+
+      // Tuval açıldığında beyaz zemin hazırla
+      useEffect(() => {
+        if (showCanvasModal && canvasRef.current) {
+          const canvas = canvasRef.current;
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+      }, [showCanvasModal]);
 
       useEffect(() => {
         const interval = setInterval(() => {
@@ -390,7 +417,9 @@
           } else if (target === "note") {
             setNewNoteContent(currentText);
           } else if (target === "iosNote") {
-            setNewIosNoteBody(prev => (prev ? prev + " " + currentText : currentText));
+            if (editorAreaRef.current) {
+              editorAreaRef.current.innerHTML += " " + currentText;
+            }
           } else if (target === "globalSearch") {
             setGlobalSearchQuery(currentText);
           }
@@ -486,6 +515,9 @@
       };
 
       const executeFormatCommand = (command, value = null) => {
+        if (editorAreaRef.current) {
+          editorAreaRef.current.focus();
+        }
         document.execCommand(command, false, value);
       };
 
@@ -507,15 +539,15 @@
       };
 
       const handleSaveIosNote = () => {
-        let bodyContent = newIosNoteBody;
-        if (editorAreaRef.current) {
-          bodyContent = editorAreaRef.current.innerHTML;
+        let bodyContent = editorAreaRef.current ? editorAreaRef.current.innerHTML : newIosNoteBody;
+        let plainText = editorAreaRef.current ? editorAreaRef.current.innerText : newIosNoteBody;
+
+        if (plainText === "Notunuzu buraya yazın...") {
+          plainText = "";
+          bodyContent = "";
         }
 
-        let plainText = editorAreaRef.current ? editorAreaRef.current.innerText : newIosNoteBody;
-        if (plainText === "Notunuzu buraya yazın...") plainText = "";
-
-        if (!newIosNoteTitle.trim() && !plainText.trim()) {
+        if (!newIosNoteTitle.trim() && !plainText.trim() && !noteImage) {
           setIsEditingNote(false);
           return;
         }
@@ -526,7 +558,7 @@
         const noteObj = {
           id: selectedNote ? selectedNote.id : "note_" + Date.now(),
           title: newIosNoteTitle || "Yeni Not",
-          subtitle: plainText ? plainText.slice(0, 45) : "Ek içerik yok",
+          subtitle: plainText ? plainText.trim().slice(0, 45) : "Ek içerik yok",
           body: bodyContent,
           image: noteImage,
           updatedAt: isoString,
@@ -560,8 +592,10 @@
         const canvas = canvasRef.current;
         if (!canvas) return { x: 0, y: 0 };
         const rect = canvas.getBoundingClientRect();
-        const clientX = evt.clientX || (evt.touches && evt.touches[0] ? evt.touches[0].clientX : 0);
-        const clientY = evt.clientY || (evt.touches && evt.touches[0] ? evt.touches[0].clientY : 0);
+        
+        const touch = evt.touches && evt.touches[0] ? evt.touches[0] : (evt.changedTouches && evt.changedTouches[0] ? evt.changedTouches[0] : null);
+        const clientX = touch ? touch.clientX : (evt.clientX !== undefined ? evt.clientX : 0);
+        const clientY = touch ? touch.clientY : (evt.clientY !== undefined ? evt.clientY : 0);
 
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
@@ -581,11 +615,12 @@
 
         ctx.beginPath();
         ctx.moveTo(x, y);
+        isDrawingRef.current = true;
         setIsDrawing(true);
       };
 
       const drawOnCanvas = (evt) => {
-        if (!isDrawing) return;
+        if (!isDrawingRef.current) return;
         if (evt.type === 'touchmove') evt.preventDefault();
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -602,6 +637,7 @@
 
       const stopDrawingOnCanvas = (evt) => {
         if (evt && evt.type === 'touchend') evt.preventDefault();
+        isDrawingRef.current = false;
         setIsDrawing(false);
       };
 
@@ -882,7 +918,7 @@
         return groups;
       };
 
-      // GENEL ARAMA HESAPLAMA SÜRECİ (GÖREVLER + TOPLANTILAR + NOTLAR)
+      // GENEL ARAMA HESAPLAMA SÜRECİ
       const getGlobalSearchResults = () => {
         const q = globalSearchQuery.toLowerCase().trim();
         if (!q) return { matchedTasks: [], matchedMeetingNotes: [], matchedNotes: [] };
@@ -1681,7 +1717,6 @@
                       ev.target.innerText = "Notunuzu buraya yazın...";
                     }
                   },
-                  dangerouslySetInnerHTML: { __html: newIosNoteBody || "Notunuzu buraya yazın..." },
                   className: "w-full min-h-[150px] bg-transparent text-sm font-medium text-slate-700 dark:text-slate-200 outline-none resize-none leading-relaxed"
                 }),
 
@@ -1895,7 +1930,7 @@
             )
           ),
 
-          /* 4. GENEL ARAMA (YENİ EKLENEN TÜM SİSTEM ARAMASI) */
+          /* 4. GENEL ARAMA */
           activeTab === "search" && e("div", { className: "space-y-4 animate-fadeIn pb-10" },
             e("div", { className: "px-1" },
               e("h2", { className: "text-2xl font-black text-slate-900 dark:text-white" }, "Genel Arama"),
@@ -2122,7 +2157,6 @@
             e("span", { className: "text-[10px]" }, "Notlarım")
           ),
 
-          /* YENİ EKLENEN GENEL ARAMA BUTONU */
           e("button", {
             onClick: () => setActiveTab("search"),
             className: `flex flex-col items-center gap-0.5 transition-all ${activeTab === "search" ? "text-blue-600 dark:text-blue-400 scale-105 font-black" : "text-slate-400 font-medium"}`
