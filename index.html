@@ -147,7 +147,7 @@
       const [selectedFolderId, setSelectedFolderId] = useState(null);
       const [selectedSessionId, setSelectedSessionId] = useState(null);
 
-      // iOS NOTLAR EKLENTİLERİ
+      // iOS NOTLAR EKLENTİLERİ VE ZENGİN METİN ARAÇ BARI DURUMLARI
       const [notes, setNotes] = useState([]);
       const [noteSearchQuery, setNoteSearchQuery] = useState("");
       const [selectedNote, setSelectedNote] = useState(null);
@@ -157,6 +157,13 @@
       const [noteImage, setNoteImage] = useState(null);
       const [showNoteOptionsMenu, setShowNoteOptionsMenu] = useState(false);
       const noteFileInputRef = useRef(null);
+
+      // Apple Toolbar Menü Durumları
+      const [activeToolbarMenu, setActiveToolbarMenu] = useState(null); // 'textStyle', 'alignment', 'more'
+      const [activeTextStyle, setActiveTextStyle] = useState("Gövde");
+      const [textAlignment, setTextAlignment] = useState("left"); // left, center, right, justify
+      const [highlightColor, setHighlightColor] = useState(null);
+      const editorAreaRef = useRef(null);
 
       // CANVAS (ÇİZİM) MODALI
       const [showCanvasModal, setShowCanvasModal] = useState(false);
@@ -494,9 +501,38 @@
         await deleteDoc(doc(window.db, "notes", id));
       };
 
+      // ZENGİN METİN (RICH TEXT) BİÇİMLENDİRME YARDIMCILARI
+      const executeFormatCommand = (command, value = null) => {
+        document.execCommand(command, false, value);
+      };
+
+      const insertTableIntoNote = () => {
+        const tableHtml = `
+          <table style="width: 100%; border-collapse: collapse; margin: 8px 0; border: 1px solid #cbd5e1;">
+            <tbody>
+              <tr><td style="border: 1px solid #cbd5e1; padding: 6px; font-size: 12px;">Hücre 1</td><td style="border: 1px solid #cbd5e1; padding: 6px; font-size: 12px;">Hücre 2</td></tr>
+              <tr><td style="border: 1px solid #cbd5e1; padding: 6px; font-size: 12px;">Hücre 3</td><td style="border: 1px solid #cbd5e1; padding: 6px; font-size: 12px;">Hücre 4</td></tr>
+            </tbody>
+          </table><br/>
+        `;
+        executeFormatCommand("insertHTML", tableHtml);
+      };
+
+      const addLinkToNote = () => {
+        const url = prompt("Eklenecek Bağlantı (URL):", "https://");
+        if (url) executeFormatCommand("createLink", url);
+      };
+
       // iOS NOTLARI KAYDETME
       const handleSaveIosNote = () => {
-        if (!newIosNoteTitle.trim() && !newIosNoteBody.trim()) {
+        let bodyContent = newIosNoteBody;
+        if (editorAreaRef.current) {
+          bodyContent = editorAreaRef.current.innerHTML;
+        }
+
+        const plainText = editorAreaRef.current ? editorAreaRef.current.innerText : newIosNoteBody;
+
+        if (!newIosNoteTitle.trim() && !plainText.trim()) {
           setIsEditingNote(false);
           return;
         }
@@ -507,8 +543,8 @@
         const noteObj = {
           id: selectedNote ? selectedNote.id : "note_" + Date.now(),
           title: newIosNoteTitle || "Yeni Not",
-          subtitle: newIosNoteBody ? newIosNoteBody.slice(0, 45) : "Ek içerik yok",
-          body: newIosNoteBody,
+          subtitle: plainText ? plainText.slice(0, 45) : "Ek içerik yok",
+          body: bodyContent,
           image: noteImage,
           updatedAt: isoString,
           createdAt: selectedNote ? selectedNote.createdAt : isoString
@@ -524,7 +560,8 @@
 
       // NOT PAYLAŞMA
       const handleShareNote = () => {
-        const textToShare = `${newIosNoteTitle}\n\n${newIosNoteBody}`;
+        const plainText = editorAreaRef.current ? editorAreaRef.current.innerText : newIosNoteBody;
+        const textToShare = `${newIosNoteTitle}\n\n${plainText}`;
         if (navigator.share) {
           navigator.share({
             title: newIosNoteTitle || "Not",
@@ -819,11 +856,12 @@
 
       // iOS NOTLAR TARİH GRUPLAMA YARDIMCISI
       const getGroupedNotes = () => {
-        const filtered = notes.filter(n => 
-          (n.title && n.title.toLowerCase().includes(noteSearchQuery.toLowerCase())) ||
-          (n.subtitle && n.subtitle.toLowerCase().includes(noteSearchQuery.toLowerCase())) ||
-          (n.body && n.body.toLowerCase().includes(noteSearchQuery.toLowerCase()))
-        );
+        const filtered = notes.filter(n => {
+          const titleMatch = n.title && n.title.toLowerCase().includes(noteSearchQuery.toLowerCase());
+          const subMatch = n.subtitle && n.subtitle.toLowerCase().includes(noteSearchQuery.toLowerCase());
+          const bodyMatch = n.body && n.body.toLowerCase().includes(noteSearchQuery.toLowerCase());
+          return titleMatch || subMatch || bodyMatch;
+        });
 
         const now = new Date();
         const thirtyDaysAgo = new Date();
@@ -1530,11 +1568,11 @@
             )
           ),
 
-          /* ---------------- 3. NOTLARIM (iOS İŞLEVSELLİĞİ) ---------------- */
+          /* ---------------- 3. NOTLARIM (iOS GELİŞMİŞ EDİTÖR) ---------------- */
           activeTab === "notes" && e("div", { className: "space-y-3 pb-24 animate-fadeIn" },
             
             /* DÜZENLEME / YENİ NOT EKRANI */
-            isEditingNote ? e("div", { className: "bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-3xl p-4 space-y-4 border border-slate-200 dark:border-slate-800 shadow-xl min-h-[75vh] flex flex-col justify-between" },
+            isEditingNote ? e("div", { className: "bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-3xl p-4 space-y-3 border border-slate-200 dark:border-slate-800 shadow-xl min-h-[78vh] flex flex-col justify-between" },
               e("div", { className: "space-y-3" },
                 /* Üst Navigasyon Barı */
                 e("div", { className: "flex items-center justify-between border-b pb-2 dark:border-slate-800" },
@@ -1566,7 +1604,8 @@
                   }, "🗑️ Notu Sil"),
                   e("button", {
                     onClick: () => {
-                      navigator.clipboard.writeText(`${newIosNoteTitle}\n${newIosNoteBody}`);
+                      const plainText = editorAreaRef.current ? editorAreaRef.current.innerText : newIosNoteBody;
+                      navigator.clipboard.writeText(`${newIosNoteTitle}\n${plainText}`);
                       alert("Tüm Metin Kopyalandı");
                       setShowNoteOptionsMenu(false);
                     },
@@ -1574,7 +1613,7 @@
                   }, "📋 Metni Kopyala")
                 ),
 
-                /* Başlık & İçerik Metin Alanı */
+                /* Başlık Metin Alanı */
                 e("input", {
                   type: "text",
                   placeholder: "Başlık",
@@ -1583,12 +1622,13 @@
                   className: "w-full bg-transparent text-xl font-black text-slate-900 dark:text-white outline-none placeholder-slate-400"
                 }),
 
-                e("textarea", {
-                  rows: "10",
-                  placeholder: "Notunuzu buraya yazın...",
-                  value: newIosNoteBody,
-                  onChange: (ev) => setNewIosNoteBody(ev.target.value),
-                  className: "w-full bg-transparent text-sm font-medium text-slate-700 dark:text-slate-200 outline-none resize-none placeholder-slate-400 leading-relaxed"
+                /* Zengin Metin Alanı (ContentEditable) */
+                e("div", {
+                  ref: editorAreaRef,
+                  contentEditable: true,
+                  suppressContentEditableWarning: true,
+                  dangerouslySetInnerHTML: { __html: newIosNoteBody || "Notunuzu buraya yazın..." },
+                  className: "w-full min-h-[220px] bg-transparent text-sm font-medium text-slate-700 dark:text-slate-200 outline-none resize-none leading-relaxed overflow-y-auto"
                 }),
 
                 noteImage && e("div", { className: "relative w-36 h-28 my-2" },
@@ -1597,29 +1637,113 @@
                 )
               ),
 
-              /* ALT İŞLEVSEL BİLGİ VE KONTROL ÇUBUĞU */
-              e("div", { className: "border-t pt-3 dark:border-slate-800 flex items-center justify-between" },
-                e("div", { className: "bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full flex items-center gap-3 border border-slate-200 dark:border-slate-700" },
+              /* APPLE NOTLAR DÜZENLEME ARAÇ ÇUBUĞU (GÖRSELLERDEN AKTARILAN TÜM ARAÇLAR) */
+              e("div", { className: "border-t pt-2 dark:border-slate-800 space-y-2" },
+                
+                /* Alt Menüler Açılır Paneli */
+                activeToolbarMenu === "textStyle" && e("div", { className: "bg-slate-100 dark:bg-slate-800 p-2 rounded-2xl flex items-center justify-between text-xs font-bold gap-1 border border-slate-200 dark:border-slate-700 animate-fadeIn" },
+                  ["Başlık", "Alt Başlık", "Gövde", "Monospaced"].map(style => e("button", {
+                    key: style,
+                    onClick: () => {
+                      setActiveTextStyle(style);
+                      if (style === "Başlık") executeFormatCommand("formatBlock", "<h1>");
+                      else if (style === "Alt Başlık") executeFormatCommand("formatBlock", "<h2>");
+                      else executeFormatCommand("formatBlock", "<p>");
+                      setActiveToolbarMenu(null);
+                    },
+                    className: `px-2.5 py-1 rounded-xl transition-all ${activeTextStyle === style ? "bg-amber-500 text-black shadow" : "hover:bg-slate-200 dark:hover:bg-slate-700"}`
+                  }, style))
+                ),
+
+                activeToolbarMenu === "alignment" && e("div", { className: "bg-slate-100 dark:bg-slate-800 p-2 rounded-2xl flex items-center justify-around text-xs font-bold border border-slate-200 dark:border-slate-700 animate-fadeIn" },
+                  e("button", { onClick: () => { executeFormatCommand("justifyLeft"); setActiveToolbarMenu(null); } }, "⇤ Sola"),
+                  e("button", { onClick: () => { executeFormatCommand("justifyCenter"); setActiveToolbarMenu(null); } }, "↔️ Ortala"),
+                  e("button", { onClick: () => { executeFormatCommand("justifyRight"); setActiveToolbarMenu(null); } }, "⇥ Sağa"),
+                  e("button", { onClick: () => { executeFormatCommand("indent"); setActiveToolbarMenu(null); } }, "➡️ Girinti Artır"),
+                  e("button", { onClick: () => { executeFormatCommand("outdent"); setActiveToolbarMenu(null); } }, "⬅️ Girinti Azalt")
+                ),
+
+                /* Görsellerdeki İkonik Araç Çubuğu */
+                e("div", { className: "bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-2xl flex items-center justify-between border border-slate-200 dark:border-slate-700 shadow-sm" },
+                  
+                  /* Aa Metin Stili */
                   e("button", {
-                    onClick: () => setNewIosNoteBody(prev => (prev ? prev + "\n[ ] " : "[ ] ")),
-                    className: "text-slate-600 dark:text-slate-300 hover:text-amber-500 font-bold text-sm"
+                    onClick: () => setActiveToolbarMenu(activeToolbarMenu === "textStyle" ? null : "textStyle"),
+                    className: "text-slate-700 dark:text-slate-200 font-black text-sm hover:text-amber-500"
+                  }, "Aa"),
+
+                  /* Kalın (B) */
+                  e("button", {
+                    onClick: () => executeFormatCommand("bold"),
+                    className: "text-slate-700 dark:text-slate-200 font-black text-sm hover:text-amber-500"
+                  }, "B"),
+
+                  /* İtalik (I) */
+                  e("button", {
+                    onClick: () => executeFormatCommand("italic"),
+                    className: "text-slate-700 dark:text-slate-200 italic font-bold text-sm hover:text-amber-500"
+                  }, "I"),
+
+                  /* Altı Çizili (U) */
+                  e("button", {
+                    onClick: () => executeFormatCommand("underline"),
+                    className: "text-slate-700 dark:text-slate-200 underline font-bold text-sm hover:text-amber-500"
+                  }, "U"),
+
+                  /* Üstü Çizili (S) */
+                  e("button", {
+                    onClick: () => executeFormatCommand("strikeThrough"),
+                    className: "text-slate-700 dark:text-slate-200 line-through font-bold text-sm hover:text-amber-500"
+                  }, "S"),
+
+                  /* Vurgu Kalemi */
+                  e("button", {
+                    onClick: () => executeFormatCommand("backColor", "#fef08a"),
+                    className: "text-slate-700 dark:text-slate-200 hover:text-amber-500 text-sm"
+                  }, "✏️"),
+
+                  /* Hizalama ve Girinti Menüsü */
+                  e("button", {
+                    onClick: () => setActiveToolbarMenu(activeToolbarMenu === "alignment" ? null : "alignment"),
+                    className: "text-slate-700 dark:text-slate-200 hover:text-amber-500 text-sm"
+                  }, "≡"),
+
+                  /* Yapılacaklar (Checklist) */
+                  e("button", {
+                    onClick: () => executeFormatCommand("insertUnorderedList"),
+                    className: "text-slate-700 dark:text-slate-200 hover:text-amber-500 text-sm font-bold"
                   }, "☑️"),
 
+                  /* Tablo Ekleme */
+                  e("button", {
+                    onClick: insertTableIntoNote,
+                    className: "text-slate-700 dark:text-slate-200 hover:text-amber-500 text-sm"
+                  }, "▦"),
+
+                  /* Bağlantı (URL) */
+                  e("button", {
+                    onClick: addLinkToNote,
+                    className: "text-slate-700 dark:text-slate-200 hover:text-amber-500 text-sm"
+                  }, "🔗"),
+
+                  /* Dosya / Medya Ekleme */
                   e("button", {
                     onClick: () => noteFileInputRef.current && noteFileInputRef.current.click(),
-                    className: "text-slate-600 dark:text-slate-300 hover:text-amber-500 font-bold text-sm"
+                    className: "text-slate-700 dark:text-slate-200 hover:text-amber-500 text-sm"
                   }, "📎"),
 
+                  /* Çizim Tuvali */
                   e("button", {
                     onClick: () => setShowCanvasModal(true),
-                    className: "text-slate-600 dark:text-slate-300 hover:text-amber-500 font-bold text-sm"
+                    className: "text-slate-700 dark:text-slate-200 hover:text-amber-500 text-sm"
                   }, "✍️")
                 ),
 
+                /* Onay ve Kaydetme Butonu */
                 e("button", {
                   onClick: handleSaveIosNote,
-                  className: "w-10 h-10 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-full font-black text-lg flex items-center justify-center shadow-lg active:scale-95"
-                }, "✓")
+                  className: "w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-2xl font-black text-sm flex items-center justify-center shadow-lg active:scale-95"
+                }, "✓ Kaydet ve Kapat")
               )
             ) :
 
@@ -1684,7 +1808,7 @@
                         e("h4", { className: "font-black text-xs text-slate-900 dark:text-white truncate" }, note.title || "Başlıksız Not"),
                         e("div", { className: "flex items-center gap-2" },
                           e("span", { className: "text-[10px] text-slate-400 font-semibold shrink-0" }, new Date(note.updatedAt || Date.now()).toLocaleDateString('tr-TR')),
-                          e("span", { className: "text-[10px] text-slate-500 dark:text-slate-400 font-normal truncate" }, note.subtitle || note.body || "Ek detay yok")
+                          e("span", { className: "text-[10px] text-slate-500 dark:text-slate-400 font-normal truncate" }, note.subtitle || note.body?.replace(/<[^>]*>?/gm, '') || "Ek detay yok")
                         )
                       ),
 
