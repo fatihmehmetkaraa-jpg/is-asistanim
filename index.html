@@ -1865,3 +1865,318 @@
   </script>
 </body>
 </html>
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>İş Asistanım PRO - Notlar</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    /* Not Alanı Düzenleme Stilleri */
+    [contenteditable="true"]:empty:before {
+      content: attr(placeholder);
+      color: #a1a1aa;
+      pointer-events: none;
+      display: block;
+    }
+
+    #editor table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+    }
+
+    #editor td {
+      border: 1px solid #d1d5db;
+      padding: 8px 12px;
+      min-width: 50px;
+    }
+
+    #editor img {
+      max-width: 100%;
+      border-radius: 12px;
+      margin: 8px 0;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Çizim Tuvali (Canvas) Katmanı */
+    .canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .canvas-active {
+      pointer-events: auto !important;
+      touch-action: none; /* Parmağın sayfayı kaydırmasını engeller */
+    }
+
+    /* Özel Scrollbar */
+    ::-webkit-scrollbar {
+      width: 0px;
+      background: transparent;
+    }
+  </style>
+</head>
+<body class="bg-[#f2f2f7] text-slate-900 min-h-screen flex flex-col justify-between overflow-x-hidden">
+
+  <header class="sticky top-0 bg-[#f2f2f7]/80 backdrop-blur-md z-30 px-4 py-3 flex items-center justify-between border-b border-gray-200/50">
+    <button class="w-9 h-9 flex items-center justify-center bg-white rounded-full shadow-sm text-amber-500 active:scale-95 transition">
+      <i data-lucide="chevron-left" class="w-6 h-6"></i>
+    </button>
+    <span class="text-xs font-semibold text-gray-400">27 Temmuz 2026 15:16</span>
+    <div class="flex items-center gap-2">
+      <button class="w-9 h-9 flex items-center justify-center bg-white rounded-full shadow-sm text-amber-500 active:scale-95 transition">
+        <i data-lucide="share" class="w-5 h-5"></i>
+      </button>
+      <button class="w-9 h-9 flex items-center justify-center bg-white rounded-full shadow-sm text-amber-500 active:scale-95 transition">
+        <i data-lucide="more-horizontal" class="w-5 h-5"></i>
+      </button>
+      <button onclick="saveNote()" class="w-9 h-9 flex items-center justify-center bg-amber-500 text-white rounded-full shadow-sm active:scale-95 transition">
+        <i data-lucide="check" class="w-5 h-5"></i>
+      </button>
+    </div>
+  </header>
+
+  <main class="relative flex-1 p-5 max-w-2xl mx-auto w-full flex flex-col">
+    <div 
+      id="editor" 
+      contenteditable="true" 
+      placeholder="Notunuzu buraya yazın..." 
+      class="w-full flex-1 outline-none text-lg leading-relaxed text-gray-800 min-h-[350px] z-0"
+    ></div>
+
+    <canvas id="drawingCanvas" class="canvas-container"></canvas>
+  </main>
+
+  <div id="drawingTools" class="hidden fixed bottom-20 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full shadow-xl border border-gray-200 z-40 flex items-center gap-3">
+    <span class="text-xs font-medium text-gray-500">Renk:</span>
+    <button onclick="setPenColor('#000000')" class="w-6 h-6 rounded-full bg-black border-2 border-white shadow"></button>
+    <button onclick="setPenColor('#ef4444')" class="w-6 h-6 rounded-full bg-red-500 border-2 border-white shadow"></button>
+    <button onclick="setPenColor('#3b82f6')" class="w-6 h-6 rounded-full bg-blue-500 border-2 border-white shadow"></button>
+    <button onclick="setPenColor('#eab308')" class="w-6 h-6 rounded-full bg-amber-500 border-2 border-white shadow"></button>
+    <div class="h-4 w-[1px] bg-gray-300"></div>
+    <button onclick="clearCanvas()" class="text-xs text-red-600 font-semibold px-2 py-1 bg-red-50 rounded-md">Temizle</button>
+  </div>
+
+  <footer class="sticky bottom-0 z-30 bg-[#f2f2f7]/95 backdrop-blur-md border-t border-gray-200 px-3 py-2 flex flex-col gap-2">
+    
+    <div id="formatMenu" class="hidden flex items-center justify-around bg-white/80 p-2 rounded-2xl shadow-sm border border-gray-100 transition-all">
+      <button onclick="format('bold')" class="p-2 hover:bg-gray-100 rounded-lg font-bold">B</button>
+      <button onclick="format('italic')" class="p-2 hover:bg-gray-100 rounded-lg italic">I</button>
+      <button onclick="format('underline')" class="p-2 hover:bg-gray-100 rounded-lg underline">U</button>
+      <button onclick="format('strikeThrough')" class="p-2 hover:bg-gray-100 rounded-lg line-through">S</button>
+      <div class="h-4 w-[1px] bg-gray-300"></div>
+      <button onclick="format('justifyLeft')" class="p-2 hover:bg-gray-100 rounded-lg"><i data-lucide="align-left" class="w-4 h-4"></i></button>
+      <button onclick="format('justifyCenter')" class="p-2 hover:bg-gray-100 rounded-lg"><i data-lucide="align-center" class="w-4 h-4"></i></button>
+      <button onclick="format('outdent')" class="p-2 hover:bg-gray-100 rounded-lg"><i data-lucide="indent-decrease" class="w-4 h-4"></i></button>
+      <button onclick="format('indent')" class="p-2 hover:bg-gray-100 rounded-lg"><i data-lucide="indent-increase" class="w-4 h-4"></i></button>
+      <button onclick="addLink()" class="p-2 hover:bg-gray-100 rounded-lg"><i data-lucide="link" class="w-4 h-4"></i></button>
+    </div>
+
+    <div class="flex items-center justify-between bg-white px-4 py-2 rounded-full shadow-sm border border-gray-200/60">
+      
+      <button onclick="toggleMenu('formatMenu')" class="p-2 text-gray-700 hover:text-amber-500 active:scale-95 transition">
+        <span class="font-semibold text-lg">Aa</span>
+      </button>
+
+      <button onclick="insertChecklist()" class="p-2 text-gray-700 hover:text-amber-500 active:scale-95 transition">
+        <i data-lucide="check-square" class="w-5 h-5"></i>
+      </button>
+
+      <button onclick="insertTable()" class="p-2 text-gray-700 hover:text-amber-500 active:scale-95 transition">
+        <i data-lucide="table" class="w-5 h-5"></i>
+      </button>
+
+      <button onclick="document.getElementById('imageLoader').click()" class="p-2 text-gray-700 hover:text-amber-500 active:scale-95 transition">
+        <i data-lucide="paperclip" class="w-5 h-5"></i>
+      </button>
+      <input type="file" id="imageLoader" class="hidden" accept="image/*" onchange="insertImage(event)">
+
+      <button id="penBtn" onclick="toggleDrawingMode()" class="p-2 text-gray-700 hover:text-amber-500 active:scale-95 transition">
+        <i data-lucide="pen-tool" class="w-5 h-5"></i>
+      </button>
+
+      <button onclick="format('insertUnorderedList')" class="p-2 text-gray-700 hover:text-amber-500 active:scale-95 transition">
+        <i data-lucide="list" class="w-5 h-5"></i>
+      </button>
+
+    </div>
+  </footer>
+
+  <script>
+    // Lucide İkonlarını Başlat
+    lucide.createIcons();
+
+    // Biçimlendirme Menüsü Aç/Kapat
+    function toggleMenu(id) {
+      const el = document.getElementById(id);
+      el.classList.toggle('hidden');
+    }
+
+    // Zengin Metin Düzenleme Fonksiyonu
+    function format(command, value = null) {
+      document.execCommand(command, false, value);
+    }
+
+    // Bağlantı Ekleme
+    function addLink() {
+      const url = prompt("Eklemek istediğiniz web adresini girin:", "https://");
+      if (url) format('createLink', url);
+    }
+
+    // Onay Kutusu (Checklist) Ekleme
+    function insertChecklist() {
+      const html = `<div class="flex items-center gap-2 my-1"><input type="checkbox" class="w-4 h-4 accent-amber-500 rounded cursor-pointer"><span> Liste elemanı</span></div><br>`;
+      document.execCommand('insertHTML', false, html);
+    }
+
+    // Tablo Ekleme
+    function insertTable() {
+      const tableHTML = `
+        <table>
+          <tr><td>Başlık 1</td><td>Başlık 2</td></tr>
+          <tr><td>İçerik 1</td><td>İçerik 2</td></tr>
+        </table><br>`;
+      document.execCommand('insertHTML', false, tableHTML);
+    }
+
+    // Resim Yükleme ve Ekleme
+    function insertImage(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const imgHTML = `<img src="${e.target.result}" alt="Yüklenen Görsel" /><br>`;
+          document.execCommand('insertHTML', false, imgHTML);
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    // Notu Kaydetme Simülasyonu
+    function saveNote() {
+      alert("Not başarıyla kaydedildi!");
+    }
+
+    /* ==========================================================================
+       DOKUNMA/KAYMA SORUNUNU KESİN ÇÖZEN CANVAS ÇİZİM MANTIĞI
+       ========================================================================== */
+    const canvas = document.getElementById('drawingCanvas');
+    const ctx = canvas.getContext('2d');
+    let isDrawing = false;
+    let isDrawingModeActive = false;
+    let penColor = '#000000';
+
+    // Canvas Boyutlarını Ekran ve Retina Çözünürlüğüne Tam Eşitleme
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      
+      ctx.scale(dpr, dpr);
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = penColor;
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+
+    // Çizim Modunu Aç/Kapat
+    function toggleDrawingMode() {
+      isDrawingModeActive = !isDrawingModeActive;
+      const penBtn = document.getElementById('penBtn');
+      const tools = document.getElementById('drawingTools');
+
+      if (isDrawingModeActive) {
+        canvas.classList.add('canvas-active');
+        penBtn.classList.add('text-amber-500');
+        tools.classList.remove('hidden');
+        resizeCanvas(); // Çizim başlamadan alan boyutunu tazele
+      } else {
+        canvas.classList.remove('canvas-active');
+        penBtn.classList.remove('text-amber-500');
+        tools.classList.add('hidden');
+      }
+    }
+
+    function setPenColor(color) {
+      penColor = color;
+      ctx.strokeStyle = color;
+    }
+
+    function clearCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // Parmağın / Farenin Gerçek Koordinatını Sapmasız Hesaplama (KAYMAYI ÖNLER)
+    function getExactCoordinates(e) {
+      const rect = canvas.getBoundingClientRect();
+      let clientX, clientY;
+
+      if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+      }
+
+      return {
+        x: clientX - rect.left,
+        y: clientY - rect.top
+      };
+    }
+
+    // Çizim Olayları
+    function startDrawing(e) {
+      if (!isDrawingModeActive) return;
+      isDrawing = true;
+      const pos = getExactCoordinates(e);
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+      if (e.type.startsWith('touch')) e.preventDefault();
+    }
+
+    function draw(e) {
+      if (!isDrawing || !isDrawingModeActive) return;
+      const pos = getExactCoordinates(e);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+      if (e.type.startsWith('touch')) e.preventDefault();
+    }
+
+    function stopDrawing() {
+      if (!isDrawing) return;
+      isDrawing = false;
+      ctx.beginPath();
+    }
+
+    // Event Listener'lar (Dokunma ve Fare için Entegre)
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseleave', stopDrawing);
+
+    canvas.addEventListener('touchstart', startDrawing, { passive: false });
+    canvas.addEventListener('touchmove', draw, { passive: false });
+    canvas.addEventListener('touchend', stopDrawing);
+  </script>
+</body>
+</html>
+
