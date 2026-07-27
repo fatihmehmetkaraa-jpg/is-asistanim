@@ -150,7 +150,7 @@
       // iOS NOTLAR SEKME EKLENTİLERİ
       const [notes, setNotes] = useState([]);
       const [noteSearchQuery, setNoteSearchQuery] = useState("");
-      const [selectedNote, setSelectedNote] = useState(null); // Detay veya Düzenleme Modu
+      const [selectedNote, setSelectedNote] = useState(null);
       const [isEditingNote, setIsEditingNote] = useState(false);
       const [newIosNoteTitle, setNewIosNoteTitle] = useState("");
       const [newIosNoteBody, setNewIosNoteBody] = useState("");
@@ -269,14 +269,16 @@
         return () => clearInterval(interval);
       }, [tasks, profile]);
 
-      // Firebase Senkronizasyonu (Görevler, Toplantılar ve NOTLAR)
+      // Firebase Senkronizasyonu (Düzeltilmiş Abonelik Temizleme Mekanizması)
       useEffect(() => {
+        let unsubTasks, unsubTopics, unsubNotes;
+
         const checkDb = setInterval(() => {
           if (window.db && window.dbFuncs) {
             clearInterval(checkDb);
             const { collection, onSnapshot } = window.dbFuncs;
 
-            const unsubTasks = onSnapshot(collection(window.db, "tasks"), (snapshot) => {
+            unsubTasks = onSnapshot(collection(window.db, "tasks"), (snapshot) => {
               const loadedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
               
               const currentTodayISO = getLocalDateISO();
@@ -293,21 +295,24 @@
               setIsSyncing(false);
             });
 
-            const unsubTopics = onSnapshot(collection(window.db, "topics"), (snapshot) => {
+            unsubTopics = onSnapshot(collection(window.db, "topics"), (snapshot) => {
               const loadedTopics = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
               setMeetingTopics(loadedTopics);
             });
 
-            // YENİ: Firebase Notlarım Sekmesi Dinleyicisi
-            const unsubNotes = onSnapshot(collection(window.db, "notes"), (snapshot) => {
+            unsubNotes = onSnapshot(collection(window.db, "notes"), (snapshot) => {
               const loadedNotes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
               setNotes(loadedNotes);
             });
-
-            return () => { unsubTasks(); unsubTopics(); unsubNotes(); };
           }
         }, 200);
-        return () => clearInterval(checkDb);
+
+        return () => {
+          clearInterval(checkDb);
+          if (unsubTasks) unsubTasks();
+          if (unsubTopics) unsubTopics();
+          if (unsubNotes) unsubNotes();
+        };
       }, []);
 
       const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
@@ -469,7 +474,6 @@
         await setDoc(doc(window.db, "topics", topicObj.id), topicObj);
       };
 
-      // YENİ: Firebase Not Kaydetme / Silme
       const saveNoteToFirebase = async (noteObj) => {
         if (!window.db) return;
         const { doc, setDoc } = window.dbFuncs;
@@ -713,7 +717,6 @@
         }
       };
 
-      // Gelişmiş Özgün Tema Stil Üretici
       const getBgStyle = () => {
         if (bgStyleType === "custom" && customBgUrl) {
           return { backgroundImage: `url(${customBgUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' };
@@ -760,8 +763,7 @@
         thirtyDaysAgo.setDate(now.getDate() - 30);
 
         const groups = {
-          "Son 30 Gün": [],
-          "Geçmiş": []
+          "Son 30 Gün": []
         };
 
         filtered.forEach(note => {
@@ -819,7 +821,7 @@
           )
         ),
 
-        /* ÖZGÜN TEMA MODALI */
+        /* TEMA MODALI */
         showThemeModal && e("div", {
           className: "fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
         },
@@ -984,7 +986,6 @@
           className: "hidden" 
         }),
 
-        // iOS Notlar Resim Yükleyici
         e("input", {
           type: "file",
           accept: "image/*",
@@ -1409,10 +1410,9 @@
             )
           ),
 
-          /* ---------------- 3. YENİ: NOTLARIM (iOS STANDART NOTLAR EKRANI) ---------------- */
+          /* ---------------- 3. NOTLARIM (iOS STANDART NOTLAR EKRANI) ---------------- */
           activeTab === "notes" && e("div", { className: "space-y-4 pb-20 animate-fadeIn" },
             
-            // DÜZENLEME VEYA YENİ NOT EKLEME EKRANI
             isEditingNote ? e("div", { className: "bg-slate-900 text-white rounded-3xl p-4 space-y-3 border border-slate-800 shadow-2xl" },
               e("div", { className: "flex items-center justify-between pb-2 border-b border-slate-800" },
                 e("button", {
@@ -1457,9 +1457,7 @@
               )
             ) :
 
-            // ANA İOS NOTLAR LİSTESİ
             e("div", { className: "space-y-4" },
-              // Üst Görsel Header (iOS Stili)
               e("div", { className: "flex items-center justify-between px-2" },
                 e("button", { className: "text-amber-500 text-2xl font-light" }, "‹"),
                 e("button", { className: "text-amber-500 font-bold tracking-widest text-lg" }, "•••")
@@ -1470,7 +1468,6 @@
                 e("span", { className: "text-xs font-bold text-slate-400 block mt-0.5" }, `${notes.length} Not`)
               ),
 
-              // Zaman Gruplu Not Kartları
               Object.entries(getGroupedNotes()).map(([groupTitle, groupNotes]) => {
                 if (groupNotes.length === 0) return null;
                 return e("div", { key: groupTitle, className: "space-y-2" },
@@ -1509,7 +1506,6 @@
                 );
               }),
 
-              // YÜZEN ALT ARAMA & YENİ NOT BARI (iOS Floating Bar)
               e("div", { className: "fixed bottom-16 left-0 right-0 max-w-md mx-auto px-4 z-30" },
                 e("div", { className: "bg-slate-900/90 backdrop-blur-md p-2 rounded-full border border-slate-800 flex items-center gap-2 shadow-2xl" },
                   e("div", { className: "flex-1 flex items-center bg-slate-800/80 rounded-full px-3 py-1.5 gap-2" },
@@ -1639,13 +1635,12 @@
             e("span", { className: "text-[10px]" }, "Toplantılar")
           ),
 
-          // YENİ NOTLARIM SEKMESİ
           e("button", {
             onClick: () => setActiveTab("notes"),
             className: `flex flex-col items-center gap-0.5 transition-all ${activeTab === "notes" ? "text-amber-500 scale-105 font-black" : "text-slate-400 font-medium"}`
           },
             e("span", { className: "text-lg" }, "📝"),
-            e("span", { className: "text-[10px]" }, "Notlerim")
+            e("span", { className: "text-[10px]" }, "Notlarım")
           ),
 
           e("button", {
