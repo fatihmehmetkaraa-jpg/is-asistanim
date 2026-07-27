@@ -147,6 +147,16 @@
       const [selectedFolderId, setSelectedFolderId] = useState(null);
       const [selectedSessionId, setSelectedSessionId] = useState(null);
 
+      // iOS NOTLAR SEKME EKLENTİLERİ
+      const [notes, setNotes] = useState([]);
+      const [noteSearchQuery, setNoteSearchQuery] = useState("");
+      const [selectedNote, setSelectedNote] = useState(null); // Detay veya Düzenleme Modu
+      const [isEditingNote, setIsEditingNote] = useState(false);
+      const [newIosNoteTitle, setNewIosNoteTitle] = useState("");
+      const [newIosNoteBody, setNewIosNoteBody] = useState("");
+      const [noteImage, setNoteImage] = useState(null);
+      const noteFileInputRef = useRef(null);
+
       // Swipe
       const touchStartX = useRef(0);
       const touchEndX = useRef(0);
@@ -259,7 +269,7 @@
         return () => clearInterval(interval);
       }, [tasks, profile]);
 
-      // Firebase Senkronizasyonu
+      // Firebase Senkronizasyonu (Görevler, Toplantılar ve NOTLAR)
       useEffect(() => {
         const checkDb = setInterval(() => {
           if (window.db && window.dbFuncs) {
@@ -288,7 +298,13 @@
               setMeetingTopics(loadedTopics);
             });
 
-            return () => { unsubTasks(); unsubTopics(); };
+            // YENİ: Firebase Notlarım Sekmesi Dinleyicisi
+            const unsubNotes = onSnapshot(collection(window.db, "notes"), (snapshot) => {
+              const loadedNotes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+              setNotes(loadedNotes);
+            });
+
+            return () => { unsubTasks(); unsubTopics(); unsubNotes(); };
           }
         }, 200);
         return () => clearInterval(checkDb);
@@ -302,9 +318,11 @@
         if (Math.abs(diff) > 70) {
           if (diff > 0) {
             if (activeTab === "daily") setActiveTab("meetings");
-            else if (activeTab === "meetings") setActiveTab("profile");
+            else if (activeTab === "meetings") setActiveTab("notes");
+            else if (activeTab === "notes") setActiveTab("profile");
           } else {
-            if (activeTab === "profile") setActiveTab("meetings");
+            if (activeTab === "profile") setActiveTab("notes");
+            else if (activeTab === "notes") setActiveTab("meetings");
             else if (activeTab === "meetings") setActiveTab("daily");
           }
         }
@@ -367,6 +385,8 @@
             setShowAddForm(true);
           } else if (target === "note") {
             setNewNoteContent(currentText);
+          } else if (target === "iosNote") {
+            setNewIosNoteBody(prev => prev + " " + currentText);
           }
         };
 
@@ -447,6 +467,47 @@
         if (!window.db) return;
         const { doc, setDoc } = window.dbFuncs;
         await setDoc(doc(window.db, "topics", topicObj.id), topicObj);
+      };
+
+      // YENİ: Firebase Not Kaydetme / Silme
+      const saveNoteToFirebase = async (noteObj) => {
+        if (!window.db) return;
+        const { doc, setDoc } = window.dbFuncs;
+        await setDoc(doc(window.db, "notes", noteObj.id), noteObj);
+      };
+
+      const deleteNoteFromFirebase = async (id) => {
+        if (!window.db) return;
+        const { doc, deleteDoc } = window.dbFuncs;
+        await deleteDoc(doc(window.db, "notes", id));
+      };
+
+      // iOS NOTLARI KAYDETME MANTIĞI
+      const handleSaveIosNote = () => {
+        if (!newIosNoteTitle.trim() && !newIosNoteBody.trim()) {
+          setIsEditingNote(false);
+          return;
+        }
+
+        const now = new Date();
+        const isoString = now.toISOString();
+
+        const noteObj = {
+          id: selectedNote ? selectedNote.id : "note_" + Date.now(),
+          title: newIosNoteTitle || "Yeni Not",
+          subtitle: newIosNoteBody.slice(0, 40) || "Ek içerik yok",
+          body: newIosNoteBody,
+          image: noteImage,
+          updatedAt: isoString,
+          createdAt: selectedNote ? selectedNote.createdAt : isoString
+        };
+
+        saveNoteToFirebase(noteObj);
+        setIsEditingNote(false);
+        setSelectedNote(null);
+        setNewIosNoteTitle("");
+        setNewIosNoteBody("");
+        setNoteImage(null);
       };
 
       // Görev Ekleme
@@ -586,7 +647,6 @@
         setEditingItem(null);
       };
 
-      // DÜZELTİLDİ: PDF ÇIKTISINDA OKUNAMAYAN METİN KONTRAST SORUNU TAMAMEN ÇÖZÜLDÜ
       const exportSessionPDF = (folderTitle, session) => {
         const element = document.createElement("div");
         element.style.padding = "20px";
@@ -688,6 +748,36 @@
         { name: "Mor", code: "#f3e5f5" }
       ];
 
+      // iOS NOTLAR TARİH GRUPLAMA YARDIMCISI
+      const getGroupedNotes = () => {
+        const filtered = notes.filter(n => 
+          (n.title && n.title.toLowerCase().includes(noteSearchQuery.toLowerCase())) ||
+          (n.subtitle && n.subtitle.toLowerCase().includes(noteSearchQuery.toLowerCase()))
+        );
+
+        const now = new Date();
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(now.getDate() - 30);
+
+        const groups = {
+          "Son 30 Gün": [],
+          "Geçmiş": []
+        };
+
+        filtered.forEach(note => {
+          const noteDate = new Date(note.updatedAt || note.createdAt || Date.now());
+          if (noteDate >= thirtyDaysAgo) {
+            groups["Son 30 Gün"].push(note);
+          } else {
+            const monthName = noteDate.toLocaleDateString('tr-TR', { month: 'long' });
+            if (!groups[monthName]) groups[monthName] = [];
+            groups[monthName].push(note);
+          }
+        });
+
+        return groups;
+      };
+
       /* ---------------- GİRİŞ / KİLİT EKRANI ---------------- */
       if (!isAuthenticated) {
         return e("div", { className: "min-h-screen flex items-center justify-center p-4 bg-slate-900 text-white" },
@@ -729,7 +819,7 @@
           )
         ),
 
-        /* ÖZGÜN TEMA MODALI (AÇILIR PENCERE) */
+        /* ÖZGÜN TEMA MODALI */
         showThemeModal && e("div", {
           className: "fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
         },
@@ -892,6 +982,18 @@
             if (file) compressImage(file, 800, 0.7, (compressedBase64) => setSelectedMeetingImage(compressedBase64));
           }, 
           className: "hidden" 
+        }),
+
+        // iOS Notlar Resim Yükleyici
+        e("input", {
+          type: "file",
+          accept: "image/*",
+          ref: noteFileInputRef,
+          onChange: (ev) => {
+            const file = ev.target.files && ev.target.files[0];
+            if (file) compressImage(file, 800, 0.7, (compressedBase64) => setNoteImage(compressedBase64));
+          },
+          className: "hidden"
         }),
 
         e("input", {
@@ -1307,7 +1409,140 @@
             )
           ),
 
-          /* ---------------- 3. "SİZ" (PROFİL) ---------------- */
+          /* ---------------- 3. YENİ: NOTLARIM (iOS STANDART NOTLAR EKRANI) ---------------- */
+          activeTab === "notes" && e("div", { className: "space-y-4 pb-20 animate-fadeIn" },
+            
+            // DÜZENLEME VEYA YENİ NOT EKLEME EKRANI
+            isEditingNote ? e("div", { className: "bg-slate-900 text-white rounded-3xl p-4 space-y-3 border border-slate-800 shadow-2xl" },
+              e("div", { className: "flex items-center justify-between pb-2 border-b border-slate-800" },
+                e("button", {
+                  onClick: () => setIsEditingNote(false),
+                  className: "text-amber-500 font-bold text-sm flex items-center gap-1"
+                }, "‹ Notlar"),
+                e("div", { className: "flex items-center gap-3" },
+                  e("button", {
+                    onClick: () => noteFileInputRef.current && noteFileInputRef.current.click(),
+                    className: "text-amber-500 text-sm font-bold"
+                  }, "📷"),
+                  e("button", {
+                    onClick: () => startLiveListening("iosNote"),
+                    className: "text-amber-500 text-sm font-bold"
+                  }, "🎙️"),
+                  e("button", {
+                    onClick: handleSaveIosNote,
+                    className: "bg-amber-500 text-black px-3 py-1 rounded-full font-black text-xs"
+                  }, "Bitti")
+                )
+              ),
+
+              e("input", {
+                type: "text",
+                placeholder: "Başlık",
+                value: newIosNoteTitle,
+                onChange: (ev) => setNewIosNoteTitle(ev.target.value),
+                className: "w-full bg-transparent text-xl font-bold text-white outline-none placeholder-slate-600"
+              }),
+
+              e("textarea", {
+                rows: "8",
+                placeholder: "Notunuzu buraya yazın...",
+                value: newIosNoteBody,
+                onChange: (ev) => setNewIosNoteBody(ev.target.value),
+                className: "w-full bg-transparent text-sm text-slate-300 outline-none resize-none placeholder-slate-600 leading-relaxed"
+              }),
+
+              noteImage && e("div", { className: "relative w-28 h-20" },
+                e("img", { src: noteImage, className: "w-full h-full object-cover rounded-xl border border-slate-700" }),
+                e("button", { onClick: () => setNoteImage(null), className: "absolute -top-1.5 -right-1.5 bg-rose-500 text-white w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shadow" }, "✕")
+              )
+            ) :
+
+            // ANA İOS NOTLAR LİSTESİ
+            e("div", { className: "space-y-4" },
+              // Üst Görsel Header (iOS Stili)
+              e("div", { className: "flex items-center justify-between px-2" },
+                e("button", { className: "text-amber-500 text-2xl font-light" }, "‹"),
+                e("button", { className: "text-amber-500 font-bold tracking-widest text-lg" }, "•••")
+              ),
+
+              e("div", { className: "px-2" },
+                e("h2", { className: "text-3xl font-black text-slate-900 dark:text-white" }, "Notlar"),
+                e("span", { className: "text-xs font-bold text-slate-400 block mt-0.5" }, `${notes.length} Not`)
+              ),
+
+              // Zaman Gruplu Not Kartları
+              Object.entries(getGroupedNotes()).map(([groupTitle, groupNotes]) => {
+                if (groupNotes.length === 0) return null;
+                return e("div", { key: groupTitle, className: "space-y-2" },
+                  e("h3", { className: "text-sm font-bold text-slate-800 dark:text-slate-200 px-2" }, groupTitle),
+                  
+                  e("div", { className: "bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-2xl border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800/60 overflow-hidden shadow-xs" },
+                    groupNotes.map(note => e("div", {
+                      key: note.id,
+                      onClick: () => {
+                        setSelectedNote(note);
+                        setNewIosNoteTitle(note.title);
+                        setNewIosNoteBody(note.body || "");
+                        setNoteImage(note.image || null);
+                        setIsEditingNote(true);
+                      },
+                      className: "p-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                    },
+                      e("div", { className: "flex-1 min-w-0" },
+                        e("h4", { className: "font-bold text-xs text-slate-900 dark:text-white truncate" }, note.title || "Başlıksız Not"),
+                        e("div", { className: "flex items-center gap-2 mt-1" },
+                          e("span", { className: "text-[10px] text-slate-400 font-medium shrink-0" }, new Date(note.updatedAt || Date.now()).toLocaleDateString('tr-TR')),
+                          e("span", { className: "text-[10px] text-slate-400 font-normal truncate" }, note.subtitle || note.body || "Ek detay yok")
+                        )
+                      ),
+
+                      note.image ? e("img", { src: note.image, className: "w-10 h-10 object-cover rounded-lg border border-slate-700 shrink-0" }) :
+                      e("button", {
+                        onClick: (ev) => {
+                          ev.stopPropagation();
+                          deleteNoteFromFirebase(note.id);
+                        },
+                        className: "text-slate-500 hover:text-rose-500 text-xs px-1"
+                      }, "🗑️")
+                    ))
+                  )
+                );
+              }),
+
+              // YÜZEN ALT ARAMA & YENİ NOT BARI (iOS Floating Bar)
+              e("div", { className: "fixed bottom-16 left-0 right-0 max-w-md mx-auto px-4 z-30" },
+                e("div", { className: "bg-slate-900/90 backdrop-blur-md p-2 rounded-full border border-slate-800 flex items-center gap-2 shadow-2xl" },
+                  e("div", { className: "flex-1 flex items-center bg-slate-800/80 rounded-full px-3 py-1.5 gap-2" },
+                    e("span", { className: "text-slate-400 text-xs" }, "🔍"),
+                    e("input", {
+                      type: "text",
+                      placeholder: "Arayın",
+                      value: noteSearchQuery,
+                      onChange: (ev) => setNoteSearchQuery(ev.target.value),
+                      className: "w-full bg-transparent text-xs text-white outline-none placeholder-slate-400"
+                    }),
+                    e("button", {
+                      onClick: () => startLiveListening("iosNote"),
+                      className: "text-slate-400 text-xs"
+                    }, "🎙️")
+                  ),
+
+                  e("button", {
+                    onClick: () => {
+                      setSelectedNote(null);
+                      setNewIosNoteTitle("");
+                      setNewIosNoteBody("");
+                      setNoteImage(null);
+                      setIsEditingNote(true);
+                    },
+                    className: "w-10 h-10 bg-slate-800 hover:bg-slate-700 rounded-full flex items-center justify-center text-amber-500 font-bold border border-slate-700 text-lg shrink-0 shadow-lg"
+                  }, "📝")
+                )
+              )
+            )
+          ),
+
+          /* ---------------- 4. "SİZ" (PROFİL) ---------------- */
           activeTab === "profile" && e("div", { className: "space-y-4 animate-fadeIn" },
             
             e("div", { className: "p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4" },
@@ -1385,7 +1620,7 @@
           )
         ),
 
-        /* NAVİGASYON BAR */
+        /* NAVİGASYON BAR (4 SEKMELİ) */
         e("nav", { className: "fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 flex items-center justify-around py-2 z-40 shadow-2xl" },
           
           e("button", {
@@ -1402,6 +1637,15 @@
           },
             e("span", { className: "text-lg" }, "📁"),
             e("span", { className: "text-[10px]" }, "Toplantılar")
+          ),
+
+          // YENİ NOTLARIM SEKMESİ
+          e("button", {
+            onClick: () => setActiveTab("notes"),
+            className: `flex flex-col items-center gap-0.5 transition-all ${activeTab === "notes" ? "text-amber-500 scale-105 font-black" : "text-slate-400 font-medium"}`
+          },
+            e("span", { className: "text-lg" }, "📝"),
+            e("span", { className: "text-[10px]" }, "Notlerim")
           ),
 
           e("button", {
