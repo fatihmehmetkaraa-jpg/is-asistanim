@@ -548,7 +548,7 @@
         }
       };
 
-      // HASSAS CANVAS KORDİNAT HESAPLAMALARI DÜZELTİLDİ
+      // CANVAS (KORDİNAT VE ÇİZİM)
       const getCanvasCoordinates = (evt) => {
         const canvas = canvasRef.current;
         if (!canvas) return { x: 0, y: 0 };
@@ -598,9 +598,12 @@
         setIsDrawing(false);
       };
 
-      // DÜZELTME: Çizimi Doğrudan Not Sayfasına Ekler ve Sayfadan Çıkmaz
+      // Çizimi Doğrudan Not Sayfasına Ekler ve Sayfadan/Sekmeden Çıkmaz
       const saveCanvasDrawingToNote = (e) => {
-        if(e) e.preventDefault();
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
         const canvas = canvasRef.current;
         if (canvas) {
           const drawnBase64 = canvas.toDataURL("image/png");
@@ -980,17 +983,20 @@
           )
         ),
 
-        /* HASSAS VE DÜZELTİLMİŞ CANVAS MODALI */
+        /* CANVAS MODALI - SAYFA TETİKLEMESİ ENGELLENDİ */
         showCanvasModal && e("div", {
+          onClick: (ev) => ev.stopPropagation(),
           className: "fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col justify-between p-4"
         },
           e("div", { className: "flex items-center justify-between text-white pb-2" },
             e("button", {
+              type: "button",
               onClick: () => setShowCanvasModal(false),
               className: "text-amber-500 font-bold text-sm"
             }, "İptal"),
             e("h3", { className: "font-black text-xs" }, "🖊️ Not Üzerine Çizim Yap"),
             e("button", {
+              type: "button",
               onClick: saveCanvasDrawingToNote,
               className: "bg-amber-500 text-black px-3 py-1 rounded-full text-xs font-black"
             }, "Ekle")
@@ -1015,6 +1021,7 @@
             e("div", { className: "flex items-center gap-2" },
               ["#000000", "#ef4444", "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6"].map(col => e("button", {
                 key: col,
+                type: "button",
                 onClick: () => setCanvasColor(col),
                 style: { backgroundColor: col },
                 className: `w-7 h-7 rounded-full border-2 ${canvasColor === col ? "border-white scale-110" : "border-transparent"}`
@@ -1554,11 +1561,13 @@
             )
           ),
 
-          /* 3. NOTLARIM (DÜZELTİLMİŞ EDİTÖR) */
+          /* 3. NOTLARIM (DÜZELTİLMİŞ EDİTÖR VE SABİT PALET) */
           activeTab === "notes" && e("div", { className: "space-y-3 pb-24 animate-fadeIn" },
             
-            isEditingNote ? e("div", { className: "bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-3xl p-4 space-y-3 border border-slate-200 dark:border-slate-800 shadow-xl min-h-[78vh] flex flex-col justify-between" },
-              e("div", { className: "space-y-3" },
+            isEditingNote ? e("div", { className: "bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-3xl p-4 border border-slate-200 dark:border-slate-800 shadow-xl h-[78vh] flex flex-col justify-between overflow-hidden relative" },
+              
+              /* ÜST MENÜ */
+              e("div", { className: "space-y-3 shrink-0" },
                 e("div", { className: "flex items-center justify-between border-b pb-2 dark:border-slate-800" },
                   e("button", {
                     onClick: handleSaveIosNote,
@@ -1603,9 +1612,11 @@
                   value: newIosNoteTitle,
                   onChange: (ev) => setNewIosNoteTitle(ev.target.value),
                   className: "w-full bg-transparent text-xl font-black text-slate-900 dark:text-white outline-none placeholder-slate-400"
-                }),
+                })
+              ),
 
-                /* OTO SİLİNEN PLACEHOLDER METNİ DÜZELTMESİ */
+              /* YAZI ALANI (DİNAMİK KAYDIRMA ALANI) */
+              e("div", { className: "flex-1 overflow-y-auto my-2 pr-1" },
                 e("div", {
                   ref: editorAreaRef,
                   contentEditable: true,
@@ -1621,7 +1632,7 @@
                     }
                   },
                   dangerouslySetInnerHTML: { __html: newIosNoteBody || "Notunuzu buraya yazın..." },
-                  className: "w-full min-h-[220px] bg-transparent text-sm font-medium text-slate-700 dark:text-slate-200 outline-none resize-none leading-relaxed overflow-y-auto"
+                  className: "w-full min-h-[150px] bg-transparent text-sm font-medium text-slate-700 dark:text-slate-200 outline-none resize-none leading-relaxed"
                 }),
 
                 noteImage && e("div", { className: "relative w-36 h-28 my-2" },
@@ -1630,7 +1641,8 @@
                 )
               ),
 
-              e("div", { className: "border-t pt-2 dark:border-slate-800 space-y-2" },
+              /* ALT BİÇİMLENDİRME PALETİ (SABİTLENMİŞ ERİŞİLEBİLİR ALAN) */
+              e("div", { className: "sticky bottom-0 z-20 bg-white dark:bg-slate-900 pt-1 space-y-2 shrink-0" },
                 activeToolbarMenu === "textStyle" && e("div", { className: "bg-slate-100 dark:bg-slate-800 p-2 rounded-2xl flex items-center justify-between text-xs font-bold gap-1 border border-slate-200 dark:border-slate-700 animate-fadeIn" },
                   ["Başlık", "Alt Başlık", "Gövde", "Monospaced"].map(style => e("button", {
                     key: style,
@@ -1711,6 +1723,7 @@
                   }, "📎"),
 
                   e("button", {
+                    type: "button",
                     onClick: () => setShowCanvasModal(true),
                     className: "text-slate-700 dark:text-slate-200 hover:text-amber-500 text-sm"
                   }, "✍️")
