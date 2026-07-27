@@ -22,17 +22,17 @@
             }
           },
           animation: {
-            fadeIn: 'fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-            slideUp: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+            fadeIn: 'fadeIn 0.2s ease-out forwards',
+            slideUp: 'slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards'
           },
           keyframes: {
             fadeIn: {
-              '0%': { opacity: '0', transform: 'scale(0.98)' },
-              '100%': { opacity: '1', transform: 'scale(1)' }
+              '0%': { opacity: '0' },
+              '100%': { opacity: '1' }
             },
             slideUp: {
-              '0%': { opacity: '0', transform: 'translateY(100%)' },
-              '100%': { opacity: '1', transform: 'translateY(0)' }
+              '0%': { transform: 'translateY(100%)' },
+              '100%': { transform: 'translateY(0)' }
             }
           }
         }
@@ -43,11 +43,15 @@
   <!-- React & ReactDOM Standalone CDN -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <!-- Babel for JSX (if needed) -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
-    /* Özel Kaydırma Çubuğu ve Mobil İyileştirmeleri */
+    /* iOS Stilinde Yoğun Buzlu Cam (Frosted Glass) Arka Plan Efekti */
+    .ios-blur-backdrop {
+      background-color: rgba(15, 23, 42, 0.45);
+      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(16px);
+    }
+    
     ::-webkit-scrollbar {
       width: 4px;
       height: 4px;
@@ -69,7 +73,7 @@
 
   <div id="root" class="h-full"></div>
 
-  <script type="text/babel">
+  <script>
     const { useState, useEffect, useRef } = React;
     const e = React.createElement;
 
@@ -169,7 +173,7 @@
 
       // --- SES KAYIT / SESLE YAZDIRMA STATE'LERİ ---
       const [isLiveListening, setIsLiveListening] = useState(false);
-      const [activeVoiceTarget, setActiveVoiceTarget] = useState(null); // 'taskTitle', 'noteBody', 'globalSearch' vb.
+      const [activeVoiceTarget, setActiveVoiceTarget] = useState(null);
       const recognitionRef = useRef(null);
 
       const [isRecordingAudio, setIsRecordingAudio] = useState(false);
@@ -289,7 +293,6 @@
                 const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/mp3' });
                 const audioUrl = URL.createObjectURL(audioBlob);
                 
-                // Seçili oturuma ses ekle
                 setMeetingFolders(prev => prev.map(folder => {
                   if (folder.id !== selectedFolderId) return folder;
                   return {
@@ -437,7 +440,6 @@
         }
 
         if (selectedNote) {
-          // Güncelle
           setNotes(notes.map(n => n.id === selectedNote.id ? {
             ...n,
             title: newIosNoteTitle || "Başlıksız Not",
@@ -447,7 +449,6 @@
             updatedAt: Date.now()
           } : n));
         } else {
-          // Yeni ekle
           const newN = {
             id: Date.now().toString(),
             title: newIosNoteTitle || "Başlıksız Not",
@@ -482,7 +483,6 @@
         }
       };
 
-      // Notları gruplama (Tarihe göre)
       const getGroupedNotes = () => {
         const filtered = notes.filter(n => 
           n.title.toLowerCase().includes(noteSearchQuery.toLowerCase()) || 
@@ -596,7 +596,7 @@
         }),
 
         /* TEMA SEÇİM MODALI */
-        showThemeModal && e("div", { className: "fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-fadeIn" },
+        showThemeModal && e("div", { className: "fixed inset-0 z-50 flex items-center justify-center ios-blur-backdrop p-4 animate-fadeIn" },
           e("div", { className: "w-full max-w-xs bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4" },
             e("h3", { className: "font-black text-sm text-slate-900 dark:text-white" }, "🎨 Tema Tercihi"),
             e("div", { className: "space-y-2" },
@@ -621,32 +621,32 @@
           )
         ),
 
-        /* MODAL: YENİ GÖREV EKLEME (GÖRSELDEKİ BİREBİR BOTTOM SHEET BULANIK ARKA PLAN TASARIMI) */
+        /* MODAL: YENİ GÖREV EKLEME (EKTEKİ GÖRSELE BİREBİR SADIK BÖLÜM) */
         showAddTaskModal && e("div", {
-          className: "fixed inset-0 z-50 flex items-end justify-center bg-slate-950/60 backdrop-blur-md transition-all duration-300 p-0 sm:p-4"
+          className: "fixed inset-0 z-50 flex items-end justify-center ios-blur-backdrop animate-fadeIn"
         },
           e("div", {
-            className: "w-full max-w-md bg-white dark:bg-slate-900 rounded-t-[32px] sm:rounded-3xl p-6 shadow-2xl border border-slate-100 dark:border-slate-800 animate-slideUp space-y-4 max-h-[90vh] overflow-y-auto"
+            className: "w-full max-w-md bg-white dark:bg-slate-900 rounded-t-[32px] p-6 shadow-2xl border-t border-slate-100 dark:border-slate-800 space-y-4 animate-slideUp max-h-[92vh] overflow-y-auto"
           },
             /* Header */
-            e("div", { className: "flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800" },
-              e("h3", { className: "text-base font-extrabold text-slate-900 dark:text-white" }, "Yeni Görev Oluştur"),
+            e("div", { className: "flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800" },
+              e("h3", { className: "text-base font-black text-slate-900 dark:text-white" }, "Yeni Görev Oluştur"),
               e("button", {
                 onClick: () => setShowAddTaskModal(false),
-                className: "w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-white font-bold transition-colors"
+                className: "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg font-bold p-1 transition-colors"
               }, "✕")
             ),
 
             /* Görev Başlığı Input */
-            e("div", { className: "space-y-1.5" },
-              e("label", { className: "text-xs font-extrabold text-slate-700 dark:text-slate-300" }, "Görev Başlığı"),
+            e("div", { className: "space-y-1" },
+              e("label", { className: "text-[13px] font-bold text-slate-700 dark:text-slate-200 block" }, "Görev Başlığı"),
               e("div", { className: "relative flex items-center" },
                 e("input", {
                   type: "text",
                   placeholder: "Örn: Kalite Kontrol Raporu Hazırlanacak",
                   value: newTaskTitle,
                   onChange: (ev) => setNewTaskTitle(ev.target.value),
-                  className: "w-full px-3.5 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium outline-none focus:border-blue-500 dark:focus:border-blue-500 text-slate-900 dark:text-white transition-all placeholder:text-slate-400"
+                  className: "w-full px-3.5 py-3 bg-[#F4F6F8] dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 rounded-xl text-xs font-medium outline-none focus:border-blue-500 text-slate-900 dark:text-white placeholder:text-slate-400"
                 }),
                 e("button", {
                   type: "button",
@@ -658,24 +658,24 @@
 
             /* Grid Row: Kategori & Öncelik */
             e("div", { className: "grid grid-cols-2 gap-3" },
-              e("div", { className: "space-y-1.5" },
-                e("label", { className: "text-xs font-extrabold text-slate-700 dark:text-slate-300" }, "Kategori"),
+              e("div", { className: "space-y-1" },
+                e("label", { className: "text-[13px] font-bold text-slate-700 dark:text-slate-200 block" }, "Kategori"),
                 e("select", {
                   value: newTaskCategory,
                   onChange: (ev) => setNewTaskCategory(ev.target.value),
-                  className: "w-full px-3 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold outline-none focus:border-blue-500 text-slate-900 dark:text-white cursor-pointer"
+                  className: "w-full px-3 py-3 bg-[#F4F6F8] dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 rounded-xl text-xs font-semibold outline-none focus:border-blue-500 text-slate-800 dark:text-white cursor-pointer"
                 },
                   ["Üretim", "Pazarlama", "Yönetim", "Satış", "Genel", "Kişisel"].map(cat => 
                     e("option", { key: cat, value: cat }, cat)
                   )
                 )
               ),
-              e("div", { className: "space-y-1.5" },
-                e("label", { className: "text-xs font-extrabold text-slate-700 dark:text-slate-300" }, "Öncelik"),
+              e("div", { className: "space-y-1" },
+                e("label", { className: "text-[13px] font-bold text-slate-700 dark:text-slate-200 block" }, "Öncelik"),
                 e("select", {
                   value: newTaskPriority,
                   onChange: (ev) => setNewTaskPriority(ev.target.value),
-                  className: "w-full px-3 py-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold outline-none focus:border-blue-500 text-slate-900 dark:text-white cursor-pointer"
+                  className: "w-full px-3 py-3 bg-[#F4F6F8] dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 rounded-xl text-xs font-semibold outline-none focus:border-blue-500 text-slate-800 dark:text-white cursor-pointer"
                 },
                   ["Düşük", "Orta", "Yüksek", "Acil"].map(prio => 
                     e("option", { key: prio, value: prio }, prio)
@@ -685,21 +685,21 @@
             ),
 
             /* Saat / Zaman Seçimi */
-            e("div", { className: "space-y-1.5" },
-              e("label", { className: "text-xs font-extrabold text-slate-700 dark:text-slate-300" }, "Saat / Zaman (İsteğe Bağlı)"),
+            e("div", { className: "space-y-1" },
+              e("label", { className: "text-[13px] font-bold text-slate-700 dark:text-slate-200 block" }, "Saat / Zaman (İsteğe Bağlı)"),
               e("input", {
                 type: "time",
                 value: newTaskTime,
                 onChange: (ev) => setNewTaskTime(ev.target.value),
-                className: "w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium outline-none focus:border-blue-500 text-slate-900 dark:text-white"
+                className: "w-full px-3.5 py-2.5 bg-[#F4F6F8] dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 rounded-xl text-xs font-medium outline-none focus:border-blue-500 text-slate-900 dark:text-white"
               })
             ),
 
             /* Fotoğraf Ekle Alanı */
-            e("div", { className: "space-y-1.5" },
-              e("label", { className: "text-xs font-extrabold text-slate-700 dark:text-slate-300 block" }, "Fotoğraf Ekle"),
+            e("div", { className: "space-y-1" },
+              e("label", { className: "text-[13px] font-bold text-slate-700 dark:text-slate-200 block" }, "Fotoğraf Ekle"),
               e("div", { className: "flex items-center gap-3" },
-                e("label", { className: "px-4 py-2 bg-blue-50 dark:bg-slate-800 hover:bg-blue-100 text-blue-600 dark:text-blue-400 font-bold rounded-xl text-xs cursor-pointer border border-blue-200 dark:border-slate-700 transition-all active:scale-95" },
+                e("label", { className: "px-3.5 py-1.5 bg-[#EBF3FF] dark:bg-blue-950/50 hover:bg-blue-100 text-[#2563EB] dark:text-blue-400 font-bold rounded-lg text-xs cursor-pointer border border-blue-100 dark:border-blue-900 transition-all active:scale-95" },
                   "Dosyayı Seç",
                   e("input", {
                     type: "file",
@@ -720,15 +720,15 @@
             ),
 
             /* Not / Açıklama */
-            e("div", { className: "space-y-1.5" },
-              e("label", { className: "text-xs font-extrabold text-slate-700 dark:text-slate-300" }, "Not / Açıklama"),
+            e("div", { className: "space-y-1" },
+              e("label", { className: "text-[13px] font-bold text-slate-700 dark:text-slate-200 block" }, "Not / Açıklama"),
               e("div", { className: "relative" },
                 e("textarea", {
                   rows: 3,
                   placeholder: "Ekstra açıklamalar...",
                   value: newTaskNote,
                   onChange: (ev) => setNewTaskNote(ev.target.value),
-                  className: "w-full p-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium outline-none focus:border-blue-500 text-slate-900 dark:text-white resize-none placeholder:text-slate-400"
+                  className: "w-full p-3 bg-[#F4F6F8] dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 rounded-xl text-xs font-medium outline-none focus:border-blue-500 text-slate-900 dark:text-white resize-none placeholder:text-slate-400"
                 }),
                 e("button", {
                   type: "button",
@@ -741,13 +741,13 @@
             /* Mavi Görev Kaydet Butonu */
             e("button", {
               onClick: handleSaveTask,
-              className: "w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-2xl text-xs shadow-lg shadow-blue-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 mt-2"
+              className: "w-full py-3.5 bg-[#2563EB] hover:bg-blue-700 text-white font-bold rounded-xl text-sm shadow-md shadow-blue-500/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2 mt-2"
             }, "Görev Kaydet")
           )
         ),
 
         /* MODAL: NOT DÜZENLEME / OLUŞTURMA (IOS NOTLAR STİLİ) */
-        isEditingNote && e("div", { className: "fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn" },
+        isEditingNote && e("div", { className: "fixed inset-0 z-50 ios-blur-backdrop flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn" },
           e("div", { className: "w-full max-w-md bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl p-4 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-3 max-h-[85vh] flex flex-col" },
             e("div", { className: "flex items-center justify-between pb-2 border-b dark:border-slate-800" },
               e("button", {
@@ -935,7 +935,6 @@
           /* 2. TOPLANTI NOTLARI TAB */
           activeTab === "meetings" && e("div", { className: "space-y-3.5 animate-fadeIn" },
             
-            /* Klasör/Toplantı Oluşturma Formu */
             e("div", { className: "p-3.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-2xs" },
               e("h3", { className: "text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5" }, "💼 Yeni Toplantı Klasörü"),
               e("div", { className: "flex gap-2" },
@@ -953,7 +952,6 @@
               )
             ),
 
-            /* Klasör ve Oturum Listesi */
             meetingFolders.map(folder => e("div", { key: folder.id },
               e("div", { className: "p-3.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-2xs" },
                 e("div", { className: "flex items-center justify-between border-b pb-2 border-slate-100 dark:border-slate-800" },
@@ -963,7 +961,6 @@
                   )
                 ),
 
-                /* Oturum Ekleme Alanı */
                 e("div", { className: "flex gap-2" },
                   e("input", {
                     type: "text",
@@ -979,7 +976,6 @@
                   }, "+ Oturum")
                 ),
 
-                /* Oturumlar */
                 folder.sessions.map(session => e("div", {
                   key: session.id,
                   className: "p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl space-y-2 border border-slate-100 dark:border-slate-800"
@@ -998,7 +994,6 @@
 
                   session.audioUrl && e("audio", { controls: true, src: session.audioUrl, className: "w-full h-8" }),
 
-                  /* Maddeler (Konu, Karar, Görev) */
                   e("div", { className: "space-y-1.5 pt-1" },
                     session.items.map(item => e("div", {
                       key: item.id,
@@ -1016,7 +1011,6 @@
                     ))
                   ),
 
-                  /* Madde Ekleme Formu */
                   e("div", { className: "pt-2 space-y-1.5" },
                     e("div", { className: "flex gap-1.5" },
                       ["topic", "decision", "task"].map(t => e("button", {
