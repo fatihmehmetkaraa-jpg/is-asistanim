@@ -403,13 +403,11 @@
         recognition.start();
       };
 
-      /* DÜZELTME 1: Ses Kaydında Bitrate Küçültme (16kbps) */
       const startAudioRecording = (target) => {
         stopAllAudioControls();
         setSpeechTarget(target);
 
         navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-          // Ses boyutunu Firestore limitine takılmayacak boyutta tutmak için 16kbps seçildi
           let options = { audioBitsPerSecond: 16000 };
           if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
             options.mimeType = 'audio/webm;codecs=opus';
@@ -477,7 +475,6 @@
         await deleteDoc(doc(window.db, "tasks", id));
       };
 
-      /* DÜZELTME 2: Hata Yakalama ve Sınır Kontrolü */
       const saveTopicToFirebase = async (topicObj) => {
         if (!window.db) return;
         const { doc, setDoc } = window.dbFuncs;
@@ -575,7 +572,6 @@
         }
       };
 
-      // CANVAS (KORDİNAT VE ÇİZİM)
       const getCanvasCoordinates = (evt) => {
         const canvas = canvasRef.current;
         if (!canvas) return { x: 0, y: 0 };
@@ -710,14 +706,12 @@
         });
       };
 
-      /* DÜZELTME 3: Toplantıya Not Ekleme Güvenlik Kontrolü */
       const addNoteToSession = async (folderId, sessionId) => {
         if (!newNoteContent.trim() && !selectedMeetingImage && !meetingAudioBlob) return;
         
         const folder = meetingTopics.find(f => f.id === folderId);
         if (!folder) return;
 
-        // Ekstra ses boyutu güvenlik kontrolü
         if (meetingAudioBlob && meetingAudioBlob.length > 800000) {
           alert("⚠️ Ses kaydı boyutu yüksek! Lütfen daha kısa bir kayıt almayı deneyin.");
           return;
@@ -907,7 +901,6 @@
         return groups;
       };
 
-      // GENEL ARAMA HESAPLAMA SÜRECİ (GÖREVLER + TOPLANTILAR + NOTLAR)
       const getGlobalSearchResults = () => {
         const q = globalSearchQuery.toLowerCase().trim();
         if (!q) return { matchedTasks: [], matchedMeetingNotes: [], matchedNotes: [] };
@@ -1058,7 +1051,6 @@
           )
         ),
 
-        /* CANVAS MODALI */
         showCanvasModal && e("div", {
           onClick: (ev) => ev.stopPropagation(),
           className: "fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col justify-between p-4"
@@ -1641,7 +1633,6 @@
             
             isEditingNote ? e("div", { className: "bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-3xl p-4 border border-slate-200 dark:border-slate-800 shadow-xl h-[78vh] flex flex-col justify-between overflow-hidden relative" },
               
-              /* ÜST MENÜ */
               e("div", { className: "space-y-3 shrink-0" },
                 e("div", { className: "flex items-center justify-between border-b pb-2 dark:border-slate-800" },
                   e("button", {
@@ -1690,7 +1681,6 @@
                 })
               ),
 
-              /* YAZI ALANI */
               e("div", { className: "flex-1 overflow-y-auto my-2 pr-1" },
                 e("div", {
                   ref: editorAreaRef,
@@ -1716,7 +1706,6 @@
                 )
               ),
 
-              /* ALT BİÇİMLENDİRME PALETİ */
               e("div", { className: "sticky bottom-0 z-20 bg-white dark:bg-slate-900 pt-1 space-y-2 shrink-0" },
                 activeToolbarMenu === "textStyle" && e("div", { className: "bg-slate-100 dark:bg-slate-800 p-2 rounded-2xl flex items-center justify-between text-xs font-bold gap-1 border border-slate-200 dark:border-slate-700 animate-fadeIn" },
                   ["Başlık", "Alt Başlık", "Gövde", "Monospaced"].map(style => e("button", {
@@ -1741,62 +1730,50 @@
                 ),
 
                 e("div", { className: "bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-2xl flex items-center justify-between border border-slate-200 dark:border-slate-700 shadow-sm" },
-                  
                   e("button", {
                     onClick: () => setActiveToolbarMenu(activeToolbarMenu === "textStyle" ? null : "textStyle"),
                     className: "text-slate-700 dark:text-slate-200 font-black text-sm hover:text-amber-500"
                   }, "Aa"),
-
                   e("button", {
                     onClick: () => executeFormatCommand("bold"),
                     className: "text-slate-700 dark:text-slate-200 font-black text-sm hover:text-amber-500"
                   }, "B"),
-
                   e("button", {
                     onClick: () => executeFormatCommand("italic"),
                     className: "text-slate-700 dark:text-slate-200 italic font-bold text-sm hover:text-amber-500"
                   }, "I"),
-
                   e("button", {
                     onClick: () => executeFormatCommand("underline"),
                     className: "text-slate-700 dark:text-slate-200 underline font-bold text-sm hover:text-amber-500"
                   }, "U"),
-
                   e("button", {
                     onClick: () => executeFormatCommand("strikeThrough"),
                     className: "text-slate-700 dark:text-slate-200 line-through font-bold text-sm hover:text-amber-500"
                   }, "S"),
-
                   e("button", {
                     onClick: () => executeFormatCommand("backColor", "#fef08a"),
                     className: "text-slate-700 dark:text-slate-200 hover:text-amber-500 text-sm"
                   }, "✏️"),
-
                   e("button", {
                     onClick: () => setActiveToolbarMenu(activeToolbarMenu === "alignment" ? null : "alignment"),
                     className: "text-slate-700 dark:text-slate-200 hover:text-amber-500 text-sm"
                   }, "≡"),
-
                   e("button", {
                     onClick: () => executeFormatCommand("insertUnorderedList"),
                     className: "text-slate-700 dark:text-slate-200 hover:text-amber-500 text-sm font-bold"
                   }, "☑️"),
-
                   e("button", {
                     onClick: insertTableIntoNote,
                     className: "text-slate-700 dark:text-slate-200 hover:text-amber-500 text-sm"
                   }, "▦"),
-
                   e("button", {
                     onClick: addLinkToNote,
                     className: "text-slate-700 dark:text-slate-200 hover:text-amber-500 text-sm"
                   }, "🔗"),
-
                   e("button", {
                     onClick: () => noteFileInputRef.current && noteFileInputRef.current.click(),
                     className: "text-slate-700 dark:text-slate-200 hover:text-amber-500 text-sm"
                   }, "📎"),
-
                   e("button", {
                     type: "button",
                     onClick: () => setShowCanvasModal(true),
@@ -1812,7 +1789,6 @@
             ) :
 
             e("div", { className: "space-y-3" },
-              
               e("div", { className: "flex items-center justify-between px-1" },
                 e("button", {
                   onClick: () => setActiveTab("daily"),
@@ -1920,7 +1896,7 @@
             )
           ),
 
-          /* 4. GENEL ARAMA (YENİ EKLENEN TÜM SİSTEM ARAMASI) */
+          /* 4. GENEL ARAMA */
           activeTab === "search" && e("div", { className: "space-y-4 animate-fadeIn pb-10" },
             e("div", { className: "px-1" },
               e("h2", { className: "text-2xl font-black text-slate-900 dark:text-white" }, "Genel Arama"),
@@ -1951,228 +1927,150 @@
               const hasSearch = globalSearchQuery.trim().length > 0;
 
               if (!hasSearch) {
-                return e("div", { className: "text-center py-12 space-y-2 text-slate-400" },
-                  e("span", { className: "text-4xl block" }, "🔎"),
-                  e("p", { className: "text-xs font-bold" }, "Aramak istediğiniz sözcük veya cümleyi yazın.")
+                return e("div", { className: "text-center py-12 text-slate-400 font-bold text-xs space-y-1" },
+                  e("span", { className: "text-2xl block" }, "🔎"),
+                  e("span", null, "Arama yapmak için yukarıya bir kelime yazın.")
                 );
               }
 
-              const totalResults = matchedTasks.length + matchedMeetingNotes.length + matchedNotes.length;
+              const totalMatches = matchedTasks.length + matchedMeetingNotes.length + matchedNotes.length;
 
-              if (totalResults === 0) {
-                return e("div", { className: "text-center py-12 text-slate-400 font-bold text-xs" }, `"${globalSearchQuery}" ile eşleşen hiçbir kayıt bulunamadı.`);
+              if (totalMatches === 0) {
+                return e("div", { className: "text-center py-12 text-slate-400 font-bold text-xs" }, "Hiçbir eşleşme bulunamadı.");
               }
 
-              return e("div", { className: "space-y-4" },
-                
-                /* GÖREV ARAMA SONUÇLARI */
-                matchedTasks.length > 0 && e("div", { className: "space-y-2" },
-                  e("h3", { className: "text-xs font-black text-slate-500 uppercase tracking-wider px-1 flex items-center justify-between" },
-                    e("span", null, "☑️ Görevler"),
-                    e("span", { className: "bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px]" }, matchedTasks.length)
-                  ),
-                  e("div", { className: "space-y-1.5" },
-                    matchedTasks.map(task => e("div", {
-                      key: task.id,
-                      className: "p-3 bg-white/95 dark:bg-slate-900/95 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-2xs"
-                    },
-                      e("div", { className: "space-y-0.5" },
-                        e("span", { className: `text-xs font-bold block ${task.completed ? "line-through text-slate-400" : "text-slate-800 dark:text-slate-100"}` }, task.title),
-                        e("span", { className: "text-[10px] text-slate-400 font-semibold" }, `Tarih: ${task.date} • Kategori: ${task.category || 'Genel'}`)
-                      ),
-                      e("button", {
-                        onClick: () => toggleTask(task.id),
-                        className: `text-[10px] font-bold px-2 py-1 rounded-lg ${task.completed ? "bg-slate-100 text-slate-500" : "bg-blue-600 text-white"}`
-                      }, task.completed ? "Tamamlandı" : "Tamamla")
-                    ))
-                  )
+              return e("div", { className: "space-y-3" },
+                e("span", { className: "text-[10px] font-black text-slate-400 px-1 block" }, `${totalMatches} sonuç bulundu`),
+
+                matchedTasks.length > 0 && e("div", { className: "space-y-1.5" },
+                  e("h3", { className: "text-xs font-black text-blue-600 px-1" }, "Görevler"),
+                  matchedTasks.map(t => e("div", {
+                    key: t.id,
+                    onClick: () => setActiveTab("daily"),
+                    className: "p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold flex items-center justify-between cursor-pointer"
+                  },
+                    e("span", null, t.title),
+                    e("span", { className: "text-[10px] text-slate-400" }, t.date)
+                  ))
                 ),
 
-                /* TOPLANTI NOTLARI SONUÇLARI */
-                matchedMeetingNotes.length > 0 && e("div", { className: "space-y-2" },
-                  e("h3", { className: "text-xs font-black text-slate-500 uppercase tracking-wider px-1 flex items-center justify-between" },
-                    e("span", null, "📁 Toplantı Notları & Kararlar"),
-                    e("span", { className: "bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-[10px]" }, matchedMeetingNotes.length)
-                  ),
-                  e("div", { className: "space-y-1.5" },
-                    matchedMeetingNotes.map(mNote => e("div", {
-                      key: mNote.id,
-                      onClick: () => {
-                        setSelectedFolderId(mNote.folderId);
-                        setSelectedSessionId(mNote.sessionId);
-                        setActiveTab("meetings");
-                      },
-                      className: "p-3 bg-white/95 dark:bg-slate-900/95 rounded-xl border border-slate-200 dark:border-slate-800 cursor-pointer hover:border-indigo-500 transition-all shadow-2xs space-y-1"
+                matchedMeetingNotes.length > 0 && e("div", { className: "space-y-1.5" },
+                  e("h3", { className: "text-xs font-black text-indigo-600 px-1" }, "Toplantı Notları"),
+                  matchedMeetingNotes.map(n => e("div", {
+                    key: n.id,
+                    onClick: () => {
+                      setSelectedFolderId(n.folderId);
+                      setSelectedSessionId(n.sessionId);
+                      setActiveTab("meetings");
                     },
-                      e("div", { className: "flex items-center justify-between" },
-                        e("span", { className: "text-[10px] font-black text-indigo-600 dark:text-indigo-400" }, `${mNote.folderTitle} ➔ ${mNote.sessionTitle}`),
-                        e("span", { className: "text-[9px] text-slate-400" }, mNote.date || '')
-                      ),
-                      e("p", { className: "text-xs font-semibold text-slate-800 dark:text-slate-100" }, mNote.content),
-                      e("span", { className: "text-[9px] font-bold text-slate-400 block" }, `👤 Sorumlu: ${mNote.assignee}`)
-                    ))
-                  )
+                    className: "p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-xs space-y-1 cursor-pointer"
+                  },
+                    e("div", { className: "text-[10px] text-indigo-500 font-bold" }, `${n.folderTitle} / ${n.sessionTitle}`),
+                    e("div", { className: "font-semibold" }, n.content)
+                  ))
                 ),
 
-                /* NOTLARIM SONUÇLARI */
-                matchedNotes.length > 0 && e("div", { className: "space-y-2" },
-                  e("h3", { className: "text-xs font-black text-slate-500 uppercase tracking-wider px-1 flex items-center justify-between" },
-                    e("span", null, "📝 Notlarım"),
-                    e("span", { className: "bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full text-[10px]" }, matchedNotes.length)
-                  ),
-                  e("div", { className: "space-y-1.5" },
-                    matchedNotes.map(note => e("div", {
-                      key: note.id,
-                      onClick: () => {
-                        setSelectedNote(note);
-                        setNewIosNoteTitle(note.title);
-                        setNewIosNoteBody(note.body || "");
-                        setNoteImage(note.image || null);
-                        setIsEditingNote(true);
-                        setActiveTab("notes");
-                      },
-                      className: "p-3 bg-white/95 dark:bg-slate-900/95 rounded-xl border border-slate-200 dark:border-slate-800 cursor-pointer hover:border-amber-500 transition-all shadow-2xs space-y-0.5"
+                matchedNotes.length > 0 && e("div", { className: "space-y-1.5" },
+                  e("h3", { className: "text-xs font-black text-amber-600 px-1" }, "Notlar"),
+                  matchedNotes.map(n => e("div", {
+                    key: n.id,
+                    onClick: () => {
+                      setSelectedNote(n);
+                      setNewIosNoteTitle(n.title);
+                      setNewIosNoteBody(n.body || "");
+                      setNoteImage(n.image || null);
+                      setIsEditingNote(true);
+                      setActiveTab("notes");
                     },
-                      e("h4", { className: "font-black text-xs text-slate-900 dark:text-white" }, note.title || "Başlıksız Not"),
-                      e("p", { className: "text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2" }, note.subtitle || note.body?.replace(/<[^>]*>?/gm, '') || "Ek detay yok")
-                    ))
-                  )
+                    className: "p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-xs space-y-1 cursor-pointer"
+                  },
+                    e("div", { className: "font-black" }, n.title),
+                    e("div", { className: "text-slate-400 truncate" }, n.subtitle)
+                  ))
                 )
               );
             })()
           ),
 
-          /* 5. PROFİL */
-          activeTab === "profile" && e("div", { className: "space-y-4 animate-fadeIn" },
-            
-            e("div", { className: "p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4" },
-              e("div", { className: "relative group" },
-                e("div", { className: "w-16 h-16 rounded-full overflow-hidden border-2 border-blue-600 bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-black text-xl text-slate-400 shadow-inner" },
-                  profile.avatar ? e("img", { src: profile.avatar, className: "w-full h-full object-cover" }) : profile.fullName.charAt(0)
-                ),
-                e("button", {
-                  onClick: () => avatarFileInputRef.current && avatarFileInputRef.current.click(),
-                  className: "absolute bottom-0 right-0 bg-blue-600 text-white p-1 rounded-full text-[10px] shadow-lg"
-                }, "📷")
+          /* 5. PROFİLLİK / AYARLAR */
+          activeTab === "profile" && e("div", { className: "space-y-4 animate-fadeIn pb-10" },
+            e("div", { className: "px-1" },
+              e("h2", { className: "text-2xl font-black text-slate-900 dark:text-white" }, "Profil & Ayarlar"),
+              e("p", { className: "text-xs font-bold text-slate-400 mt-0.5" }, "Kurumsal kullanıcı profili ve görünüm seçenekleri")
+            ),
+
+            e("div", { className: "p-4 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4" },
+              e("div", { 
+                onClick: () => avatarFileInputRef.current && avatarFileInputRef.current.click(),
+                className: "w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center text-white text-2xl font-black overflow-hidden relative cursor-pointer shadow-md group"
+              },
+                profile.avatar ? e("img", { src: profile.avatar, className: "w-full h-full object-cover" }) : profile.fullName.charAt(0),
+                e("div", { className: "absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-[10px] text-white transition-opacity font-bold" }, "Değiş")
               ),
-              e("div", { className: "flex-1 space-y-0.5" },
-                e("h3", { className: "font-black text-sm text-slate-900 dark:text-white" }, profile.fullName),
-                e("p", { className: "text-[11px] text-slate-500 font-medium" }, profile.email),
-                e("p", { className: "text-[11px] text-slate-400 font-medium" }, profile.phone)
+              e("div", { className: "space-y-1 flex-1" },
+                e("input", {
+                  type: "text",
+                  value: profile.fullName,
+                  onChange: (ev) => saveProfile({ ...profile, fullName: ev.target.value }),
+                  className: "w-full bg-transparent text-sm font-black text-slate-900 dark:text-white outline-none border-b border-transparent focus:border-blue-500"
+                }),
+                e("input", {
+                  type: "text",
+                  value: profile.email,
+                  onChange: (ev) => saveProfile({ ...profile, email: ev.target.value }),
+                  className: "w-full bg-transparent text-xs font-semibold text-slate-400 outline-none border-b border-transparent focus:border-blue-500"
+                })
               )
             ),
 
-            e("div", { className: "p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-3" },
-              e("h4", { className: "font-black text-xs text-slate-800 dark:text-slate-200 flex items-center gap-1.5" }, "👤 Profil & Kişisel Bilgiler"),
-              
-              e("div", { className: "space-y-2" },
-                e("div", null,
-                  e("label", { className: "text-[10px] font-bold text-slate-400 block mb-0.5" }, "Ad Soyad"),
-                  e("input", {
-                    type: "text",
-                    value: profile.fullName,
-                    onChange: (ev) => saveProfile({ ...profile, fullName: ev.target.value }),
-                    className: "w-full p-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs font-semibold outline-none"
-                  })
-                ),
-                e("div", null,
-                  e("label", { className: "text-[10px] font-bold text-slate-400 block mb-0.5" }, "E-posta Adresi"),
-                  e("input", {
-                    type: "email",
-                    value: profile.email,
-                    onChange: (ev) => saveProfile({ ...profile, email: ev.target.value }),
-                    className: "w-full p-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs font-semibold outline-none"
-                  })
-                ),
-                e("div", null,
-                  e("label", { className: "text-[10px] font-bold text-slate-400 block mb-0.5" }, "Telefon Numarası"),
-                  e("input", {
-                    type: "text",
-                    value: profile.phone,
-                    onChange: (ev) => saveProfile({ ...profile, phone: ev.target.value }),
-                    className: "w-full p-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs font-semibold outline-none"
-                  })
-                )
-              )
-            ),
-
-            e("div", { className: "p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between" },
-              e("div", null,
-                e("h4", { className: "font-black text-xs text-slate-800 dark:text-slate-200" }, "🎨 Görünüm & Tema Stilleri"),
-                e("p", { className: "text-[10px] text-slate-400 font-medium" }, "Renk Paleti, Stil Kataloğu & Özel Duvar Kağıdı")
-              ),
+            e("div", { className: "bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-4 space-y-3 shadow-sm" },
+              e("h3", { className: "text-xs font-black text-slate-700 dark:text-slate-300" }, "🎨 Tema ve Arayüz Ayarları"),
               e("button", {
                 onClick: () => setShowThemeModal(true),
-                className: "px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black shadow-md flex items-center gap-1.5"
-              }, "Temaları Aç ➔")
+                className: "w-full py-3 bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-2xl text-xs font-black flex items-center justify-center gap-2 shadow-xs"
+              }, "🌈 Arka Plan ve Renk Paletini Değiştir")
             ),
 
-            e("div", { className: "p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between" },
-              e("div", null,
-                e("h4", { className: "font-black text-xs text-slate-800 dark:text-slate-200" }, "🔒 Güvenlik & Oturum"),
-                e("p", { className: "text-[10px] text-slate-400 font-medium" }, "PIN Kilidi ve Oturum Yönetimi")
-              ),
+            e("div", { className: "bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-4 space-y-3 shadow-sm" },
+              e("h3", { className: "text-xs font-black text-slate-700 dark:text-slate-300" }, "🔒 Güvenlik & Oturum"),
               e("button", {
                 onClick: handleLogout,
-                className: "px-3 py-1.5 bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 rounded-xl text-xs font-bold"
-              }, "Çıkış Yap")
+                className: "w-full py-3 bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-2xl text-xs font-black flex items-center justify-center gap-2 shadow-xs"
+              }, "🚪 Güvenli Çıkış Yap (PIN Kilitle)")
             )
           )
+
         ),
 
-        /* ALT NAVİGASYON BAR */
-        e("nav", { className: "fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 flex items-center justify-around py-2 z-40 shadow-2xl" },
-          
-          e("button", {
-            onClick: () => setActiveTab("daily"),
-            className: `flex flex-col items-center gap-0.5 transition-all ${activeTab === "daily" ? "text-blue-600 dark:text-blue-400 scale-105 font-black" : "text-slate-400 font-medium"}`
-          },
-            e("span", { className: "text-lg" }, "☑️"),
-            e("span", { className: "text-[10px]" }, "Görevler")
-          ),
-
-          e("button", {
-            onClick: () => setActiveTab("meetings"),
-            className: `flex flex-col items-center gap-0.5 transition-all ${activeTab === "meetings" ? "text-blue-600 dark:text-blue-400 scale-105 font-black" : "text-slate-400 font-medium"}`
-          },
-            e("span", { className: "text-lg" }, "📁"),
-            e("span", { className: "text-[10px]" }, "Toplantılar")
-          ),
-
-          e("button", {
-            onClick: () => setActiveTab("notes"),
-            className: `flex flex-col items-center gap-0.5 transition-all ${activeTab === "notes" ? "text-amber-500 scale-105 font-black" : "text-slate-400 font-medium"}`
-          },
-            e("span", { className: "text-lg" }, "📝"),
-            e("span", { className: "text-[10px]" }, "Notlarım")
-          ),
-
-          /* YENİ EKLENEN GENEL ARAMA BUTONU */
-          e("button", {
-            onClick: () => setActiveTab("search"),
-            className: `flex flex-col items-center gap-0.5 transition-all ${activeTab === "search" ? "text-blue-600 dark:text-blue-400 scale-105 font-black" : "text-slate-400 font-medium"}`
-          },
-            e("span", { className: "text-lg" }, "🔍"),
-            e("span", { className: "text-[10px]" }, "Arama")
-          ),
-
-          e("button", {
-            onClick: () => setActiveTab("profile"),
-            className: `flex flex-col items-center gap-0.5 transition-all ${activeTab === "profile" ? "text-blue-600 dark:text-blue-400 scale-105 font-black" : "text-slate-400 font-medium"}`
-          },
-            profile.avatar ? e("img", { 
-              src: profile.avatar, 
-              className: `w-6 h-6 rounded-full object-cover border ${activeTab === "profile" ? "border-blue-600 ring-2 ring-blue-600/30" : "border-slate-400"}` 
-            }) : e("div", { 
-              className: `w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[10px] font-bold ${activeTab === "profile" ? "bg-blue-600 text-white" : ""}` 
-            }, profile.fullName.charAt(0)),
-            e("span", { className: "text-[10px]" }, "Siz")
-          )
+        /* ALT NAVİGASYON ÇUBUĞU */
+        e("nav", { className: "fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 px-3 py-2 flex items-center justify-around z-30 shadow-lg" },
+          [
+            { id: "daily", label: "Görevler", icon: "📋" },
+            { id: "meetings", label: "Toplantı", icon: "📁" },
+            { id: "notes", label: "Notlar", icon: "📝" },
+            { id: "search", label: "Arama", icon: "🔍" },
+            { id: "profile", label: "Profil", icon: "⚙️" }
+          ].map(tab => {
+            const isActive = activeTab === tab.id;
+            return e("button", {
+              key: tab.id,
+              onClick: () => setActiveTab(tab.id),
+              className: `flex flex-col items-center gap-0.5 px-3 py-1 rounded-2xl transition-all ${
+                isActive 
+                  ? "text-blue-600 dark:text-blue-400 font-black scale-105" 
+                  : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 font-bold"
+              }`
+            },
+              e("span", { className: "text-base" }, tab.icon),
+              e("span", { className: "text-[10px]" }, tab.label)
+            );
+          })
         )
+
       );
     }
 
-    ReactDOM.createRoot(document.getElementById("root")).render(e(App));
+    ReactDOM.render(e(App), document.getElementById("root"));
   </script>
 </body>
 </html>
